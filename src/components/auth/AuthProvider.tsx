@@ -12,21 +12,20 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue>({ user: null, loading: true });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => getCurrentUser());
-  const [loading, setLoading] = useState<boolean>(true);
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Get current user immediately
+    const currentUser = getCurrentUser();
+    setUser(currentUser);
+    setLoading(false);
+
     // Listen for auth state changes
     const unsubscribe = onAuthStateChange((authUser) => {
       setUser(authUser);
-      setLoading(false); // Auth state initialized
-    });
-
-    // Set loading to false after initial check
-    const currentUser = getCurrentUser();
-    if (currentUser !== undefined) {
       setLoading(false);
-    }
+    });
 
     return unsubscribe;
   }, []);

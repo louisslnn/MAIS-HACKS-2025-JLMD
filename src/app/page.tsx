@@ -39,7 +39,7 @@ export default function Home() {
         <div className="flex flex-col items-center justify-center gap-6">
           {loading ? (
             <div className="flex items-center gap-3 text-ink-soft">
-              <div className="inline-block animate-spin rounded-full h-6 w-6 border-2 border-brand border-t-transparent"></div>
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-brand border-t-transparent"></div>
               <span>Loading...</span>
             </div>
           ) : user ? (
