@@ -29,21 +29,50 @@ export function MatchResults({ match, userId, onPlayAgain }: MatchResultsProps) 
       if (!firestore || !userId || !match.id) return;
 
       try {
-        // Get user's current rating
         const userRef = doc(firestore, "users", userId);
-        const userSnap = await getDoc(userRef);
+        const player = match.players[userId];
+        const oldRating = player?.ratingAtStart || 1000;
         
+        // Wait for rating to be processed by polling with exponential backoff
+        let attempts = 0;
+        const maxAttempts = 10;
+        let delay = 500; // Start with 500ms
+        
+        while (attempts < maxAttempts) {
+          const userSnap = await getDoc(userRef);
+          
+          if (userSnap.exists()) {
+            const userData = userSnap.data();
+            const currentRating = userData.rating || 1000;
+            const delta = currentRating - oldRating;
+            
+            // If rating changed or we've tried enough times, use the value
+            if (delta !== 0 || attempts >= maxAttempts - 1) {
+              setRatingChange({
+                oldRating,
+                newRating: currentRating,
+                delta,
+              });
+              setLoading(false);
+              return;
+            }
+          }
+          
+          // Wait before retrying (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, delay));
+          delay = Math.min(delay * 1.5, 3000); // Max 3 seconds
+          attempts++;
+        }
+        
+        // Fallback: show no change if rating never updated
+        const userSnap = await getDoc(userRef);
         if (userSnap.exists()) {
           const userData = userSnap.data();
           const currentRating = userData.rating || 1000;
-          const player = match.players[userId];
-          const oldRating = player?.ratingAtStart || currentRating;
-          const delta = currentRating - oldRating;
-
           setRatingChange({
             oldRating,
             newRating: currentRating,
-            delta,
+            delta: currentRating - oldRating,
           });
         }
       } catch (error) {
