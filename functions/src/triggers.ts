@@ -211,18 +211,32 @@ export const onMatchCompleted = onDocumentUpdated(
       const playerA = match.players[uidA];
       const playerB = match.players[uidB];
 
+      // Get current stats to determine K-factor based on games played
+      const userARef = db.collection(collections.users).doc(uidA);
+      const userBRef = db.collection(collections.users).doc(uidB);
+      const [userASnap, userBSnap] = await Promise.all([
+        tx.get(userARef),
+        tx.get(userBRef),
+      ]);
+      
+      const gamesPlayedA = userASnap.data()?.stats?.matchesPlayed ?? 0;
+      const gamesPlayedB = userBSnap.data()?.stats?.matchesPlayed ?? 0;
+
       const { winner, resultA } = determineWinner(match);
+      
+      // Chess.com-style Elo with dynamic K-factors
       const { a: newRatingA, b: newRatingB } = elo(
         playerA.ratingAtStart,
         playerB.ratingAtStart,
         resultA,
+        {
+          gamesPlayedA,
+          gamesPlayedB,
+        }
       );
 
       const resultB = 1 - resultA as 0 | 0.5 | 1;
       const now = Timestamp.now();
-
-      const userARef = db.collection(collections.users).doc(uidA);
-      const userBRef = db.collection(collections.users).doc(uidB);
 
       const historyARef = db
         .collection(`${collections.ratings}/${uidA}/history`)

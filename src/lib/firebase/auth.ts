@@ -79,7 +79,7 @@ async function createUserDocument(user: User, displayName?: string): Promise<voi
     uid: user.uid,
     displayName: displayName || user.displayName || 'Anonymous',
     email: user.email || '',
-    rating: 1500,
+    rating: 1000, // Chess.com-style starting rating
     stats: {
       wins: 0,
       losses: 0,

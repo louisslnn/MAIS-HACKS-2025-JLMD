@@ -35,7 +35,7 @@ export function MatchResults({ match, userId, onPlayAgain }: MatchResultsProps) 
         
         if (userSnap.exists()) {
           const userData = userSnap.data();
-          const currentRating = userData.rating || 1500;
+          const currentRating = userData.rating || 1000;
           const player = match.players[userId];
           const oldRating = player?.ratingAtStart || currentRating;
           const delta = currentRating - oldRating;

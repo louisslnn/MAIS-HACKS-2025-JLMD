@@ -69,7 +69,7 @@ export function MatchmakingLobby({ category, onCancel }: MatchmakingLobbyProps) 
           return {
             uid: doc.id,
             displayName: data.displayName || "Anonymous",
-            ratingSnapshot: data.ratingSnapshot || 1500,
+            ratingSnapshot: data.ratingSnapshot || 1000,
             mode: data.mode,
             topic: data.topic,
             createdAt: data.createdAt?.toDate() || new Date(),

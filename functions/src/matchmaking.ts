@@ -16,7 +16,16 @@ const requestSchema = z.object({
   difficulty: z.enum(["easy", "medium", "hard"]).default("medium"),
 });
 
-const MAX_RATING_DIFF = 200;
+/**
+ * Chess.com-style dynamic rating range that expands over time
+ * Start narrow for better matches, expand if no match found
+ */
+function calculateRatingRange(queueTimeSeconds: number): number {
+  if (queueTimeSeconds < 30) return 100;  // First 30s: ±100
+  if (queueTimeSeconds < 60) return 200;  // 30-60s: ±200
+  if (queueTimeSeconds < 90) return 300;  // 60-90s: ±300
+  return 400;                              // 90s+: ±400 (max)
+}
 
 /**
  * Try to match the current player immediately with any waiting compatible player
@@ -42,7 +51,7 @@ async function tryMatchImmediately(
     return null;
   }
 
-  const currentTime = Timestamp.now();
+  let currentTime = Timestamp.now();
   
   // First, filter candidates synchronously
   const potentialCandidates = snapshot.docs
@@ -95,23 +104,33 @@ async function tryMatchImmediately(
     candidateCount: candidates.length,
   });
 
-  // Find best match (closest rating within MAX_RATING_DIFF)
+  // Find best match using Chess.com-style expanding rating range
+  // Check each candidate's queue time to determine acceptable rating difference
+  currentTime = Timestamp.now();
   let bestMatch: (typeof candidates)[0] | null = null;
   let bestDiff = Number.POSITIVE_INFINITY;
 
   for (const candidate of candidates) {
+    // Calculate how long the candidate has been waiting
+    const queueTimeSeconds = Math.floor(
+      (currentTime.toMillis() - candidate.createdAt.toMillis()) / 1000
+    );
+    
+    // Dynamic rating range based on wait time
+    const acceptableRange = calculateRatingRange(queueTimeSeconds);
     const diff = Math.abs(candidate.ratingSnapshot - currentRating);
-    if (diff < bestDiff && diff <= MAX_RATING_DIFF) {
+    
+    if (diff <= acceptableRange && diff < bestDiff) {
       bestDiff = diff;
       bestMatch = candidate;
     }
   }
 
   if (!bestMatch) {
-    logger.info("No suitable match found within rating range", {
+    logger.info("No suitable match found within dynamic rating range", {
       currentUid,
       currentRating,
-      maxRatingDiff: MAX_RATING_DIFF,
+      candidatesChecked: candidates.length,
     });
     return null;
   }
@@ -199,7 +218,7 @@ export const requestQuickMatch = onCall(
         rating?: number;
       };
 
-      const rating = userData.rating ?? 1500;
+      const rating = userData?.rating ?? 1000; // Chess.com-style default rating
 
       // FORCE CLEANUP: Remove from any existing queue and reset state
       // This ensures a clean slate when joining matchmaking
@@ -304,7 +323,7 @@ export const quickMatchmaker = onSchedule(
       return;
     }
 
-    const currentTime = Timestamp.now();
+    let currentTime = Timestamp.now();
     
     // Filter out expired tickets first
     const potentialTickets = snapshot.docs
@@ -340,9 +359,17 @@ export const quickMatchmaker = onSchedule(
 
     const matched = new Set<string>();
 
+    currentTime = Timestamp.now();
+
     for (let i = 0; i < tickets.length; i += 1) {
       const current = tickets[i];
       if (matched.has(current.id)) continue;
+
+      // Calculate how long this player has been waiting
+      const currentQueueTimeSeconds = Math.floor(
+        (currentTime.toMillis() - current.createdAt.toMillis()) / 1000
+      );
+      const currentAcceptableRange = calculateRatingRange(currentQueueTimeSeconds);
 
       let bestMatch: typeof current | null = null;
       let bestDiff = Number.POSITIVE_INFINITY;
@@ -353,18 +380,26 @@ export const quickMatchmaker = onSchedule(
         if (candidate.mode !== current.mode) continue;
         if (candidate.topic !== current.topic) continue; // Match same topic
 
+        // Calculate candidate's queue time
+        const candidateQueueTimeSeconds = Math.floor(
+          (currentTime.toMillis() - candidate.createdAt.toMillis()) / 1000
+        );
+        const candidateAcceptableRange = calculateRatingRange(candidateQueueTimeSeconds);
+        
+        // Use the maximum acceptable range between the two players
+        const maxAcceptableRange = Math.max(currentAcceptableRange, candidateAcceptableRange);
+        
         const diff = Math.abs(
           candidate.ratingSnapshot - current.ratingSnapshot,
         );
 
-        if (diff < bestDiff) {
+        if (diff <= maxAcceptableRange && diff < bestDiff) {
           bestDiff = diff;
           bestMatch = candidate;
         }
       }
 
       if (!bestMatch) continue;
-      if (bestDiff > MAX_RATING_DIFF) continue;
 
       logger.info("Creating match", {
         player1: current.uid,

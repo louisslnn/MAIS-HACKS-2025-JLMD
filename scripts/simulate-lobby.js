@@ -53,7 +53,7 @@ const firebaseConfig = {
 };
 
 // Helper to create test user
-async function createTestUser(email, displayName, rating = 1500) {
+async function createTestUser(email, displayName, rating = 1000) {
   try {
     let user;
     try {

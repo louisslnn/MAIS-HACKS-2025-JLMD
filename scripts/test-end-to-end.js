@@ -50,7 +50,7 @@ function log(message, color = 'reset') {
   console.log(`${colors[color]}${message}${colors.reset}`);
 }
 
-async function createTestUser(email, displayName, rating = 1500) {
+async function createTestUser(email, displayName, rating = 1000) {
   try {
     let user;
     try {
@@ -175,7 +175,7 @@ async function testEndToEnd() {
     for (let i = 1; i <= TEST_USERS; i++) {
       const email = `e2etest${i}@mathclash.test`;
       const displayName = `E2ETestUser${i}`;
-      const rating = 1500 + (i % 2 === 0 ? 50 : -50);
+      const rating = 1000 + (i % 2 === 0 ? 50 : -50);
       
       const user = await createTestUser(email, displayName, rating);
       users.push({ email, uid: user.uid, displayName, rating });

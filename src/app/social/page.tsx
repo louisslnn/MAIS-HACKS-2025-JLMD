@@ -60,7 +60,7 @@ export default function SocialPage() {
           return {
             uid: doc.id,
             displayName: data.displayName || "Anonymous",
-            rating: data.rating || 1500,
+            rating: data.rating || 1000,
             stats: data.stats,
           };
         });
