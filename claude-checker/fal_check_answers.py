@@ -64,10 +64,11 @@ CRITICAL: You MUST respond with ONLY a valid JSON object. No markdown, no code b
 SPEED IS PARAMOUNT: Respond as quickly as possible with minimal tokens. Skip any verbose analysis.
 
 Required JSON structure (follow this EXACTLY):
-{{"results":[{{"id":1,"is_correct":true,"confidence":1.0,"notes":""}},{{"id":2,"is_correct":false,"confidence":0.95,"notes":"addition error"}}]}}
+{{"results":[{{"id":1,"type":"addition","is_correct":true,"confidence":1.0,"notes":""}},{{"id":2,"type":"multiplication","is_correct":false,"confidence":0.95,"notes":"multiplication error"}}]}}
 
 Rules:
 - "id" must be an integer matching the problem ID
+- "type" must be a string matching the problem type from the expected list (e.g., "addition", "multiplication", "integral")
 - "is_correct" must be boolean (true/false, lowercase, no quotes)
 - "confidence" must be a float between 0.0 and 1.0 (how certain you are about this verification)
   - 1.0 = completely certain (problem clearly visible, answer obviously correct/incorrect)
