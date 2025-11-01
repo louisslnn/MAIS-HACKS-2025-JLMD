@@ -6,7 +6,7 @@ import { LoginButton } from "@/components/auth/LoginButton";
 import { Button } from "@/components/ui";
 
 export default function Home() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
 
   return (
     <div className="relative min-h-[calc(100vh-200px)] flex items-center justify-center overflow-hidden">
@@ -37,7 +37,12 @@ export default function Home() {
         </p>
 
         <div className="flex flex-col items-center justify-center gap-6">
-          {user ? (
+          {loading ? (
+            <div className="flex items-center gap-3 text-ink-soft">
+              <div className="inline-block animate-spin rounded-full h-6 w-6 border-2 border-brand border-t-transparent"></div>
+              <span>Loading...</span>
+            </div>
+          ) : user ? (
             <div className="flex flex-col sm:flex-row items-center gap-4">
               <Button size="lg" className="w-full sm:w-auto text-lg px-8 py-6" asChild>
                 <Link href="/play">

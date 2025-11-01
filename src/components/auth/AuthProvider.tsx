@@ -13,13 +13,20 @@ const AuthContext = createContext<AuthContextValue>({ user: null, loading: true 
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => getCurrentUser());
-  const loading = false;
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     // Listen for auth state changes
     const unsubscribe = onAuthStateChange((authUser) => {
       setUser(authUser);
+      setLoading(false); // Auth state initialized
     });
+
+    // Set loading to false after initial check
+    const currentUser = getCurrentUser();
+    if (currentUser !== undefined) {
+      setLoading(false);
+    }
 
     return unsubscribe;
   }, []);
