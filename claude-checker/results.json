@@ -1,0 +1,75 @@
+{
+  "model": "anthropic/claude-sonnet-4.5 (via fal-ai/any-llm/vision)",
+  "image_analyzed": "C:\\Users\\julie\\Documents\\Github\\MAIS-HACKS-2025-JLMD\\claude-checker\\testsheet.jpg",
+  "claude_response": "{\"results\":[{\"id\":1,\"is_correct\":true,\"found_in_image\":true,\"notes\":\"\"},{\"id\":2,\"is_correct\":true,\"found_in_image\":true,\"notes\":\"\"},{\"id\":3,\"is_correct\":true,\"found_in_image\":true,\"notes\":\"\"},{\"id\":4,\"is_correct\":true,\"found_in_image\":true,\"notes\":\"\"},{\"id\":5,\"is_correct\":true,\"found_in_image\":true,\"notes\":\"\"},{\"id\":6,\"is_correct\":false,\"found_in_image\":true,\"notes\":\"wrote 12 not 16\"},{\"id\":7,\"is_correct\":false,\"found_in_image\":true,\"notes\":\"wrote 17 not 16\"},{\"id\":8,\"is_correct\":true,\"found_in_image\":true,\"notes\":\"\"},{\"id\":9,\"is_correct\":true,\"found_in_image\":true,\"notes\":\"\"},{\"id\":10,\"is_correct\":true,\"found_in_image\":true,\"notes\":\"\"}]}",
+  "raw_result": {
+    "output": "{\"results\":[{\"id\":1,\"is_correct\":true,\"found_in_image\":true,\"notes\":\"\"},{\"id\":2,\"is_correct\":true,\"found_in_image\":true,\"notes\":\"\"},{\"id\":3,\"is_correct\":true,\"found_in_image\":true,\"notes\":\"\"},{\"id\":4,\"is_correct\":true,\"found_in_image\":true,\"notes\":\"\"},{\"id\":5,\"is_correct\":true,\"found_in_image\":true,\"notes\":\"\"},{\"id\":6,\"is_correct\":false,\"found_in_image\":true,\"notes\":\"wrote 12 not 16\"},{\"id\":7,\"is_correct\":false,\"found_in_image\":true,\"notes\":\"wrote 17 not 16\"},{\"id\":8,\"is_correct\":true,\"found_in_image\":true,\"notes\":\"\"},{\"id\":9,\"is_correct\":true,\"found_in_image\":true,\"notes\":\"\"},{\"id\":10,\"is_correct\":true,\"found_in_image\":true,\"notes\":\"\"}]}",
+    "reasoning": null,
+    "partial": false,
+    "error": null
+  },
+  "verification_results": {
+    "results": [
+      {
+        "id": 1,
+        "is_correct": true,
+        "found_in_image": true,
+        "notes": ""
+      },
+      {
+        "id": 2,
+        "is_correct": true,
+        "found_in_image": true,
+        "notes": ""
+      },
+      {
+        "id": 3,
+        "is_correct": true,
+        "found_in_image": true,
+        "notes": ""
+      },
+      {
+        "id": 4,
+        "is_correct": true,
+        "found_in_image": true,
+        "notes": ""
+      },
+      {
+        "id": 5,
+        "is_correct": true,
+        "found_in_image": true,
+        "notes": ""
+      },
+      {
+        "id": 6,
+        "is_correct": false,
+        "found_in_image": true,
+        "notes": "wrote 12 not 16"
+      },
+      {
+        "id": 7,
+        "is_correct": false,
+        "found_in_image": true,
+        "notes": "wrote 17 not 16"
+      },
+      {
+        "id": 8,
+        "is_correct": true,
+        "found_in_image": true,
+        "notes": ""
+      },
+      {
+        "id": 9,
+        "is_correct": true,
+        "found_in_image": true,
+        "notes": ""
+      },
+      {
+        "id": 10,
+        "is_correct": true,
+        "found_in_image": true,
+        "notes": ""
+      }
+    ]
+  }
+}
