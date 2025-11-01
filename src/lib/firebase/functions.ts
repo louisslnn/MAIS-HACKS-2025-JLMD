@@ -110,3 +110,17 @@ export interface ResetAllRatingsResponse {
  */
 export const resetAllRatings: HttpsCallable<{}, ResetAllRatingsResponse> = 
   httpsCallable(functions, 'resetAllRatings');
+
+export interface BackfillUserDocumentsResponse {
+  success: boolean;
+  totalUsers: number;
+  backfilledCount: number;
+  existingCount: number;
+  errorCount: number;
+}
+
+/**
+ * Admin function: Backfill missing user documents
+ */
+export const backfillUserDocuments: HttpsCallable<{}, BackfillUserDocumentsResponse> = 
+  httpsCallable(functions, 'backfillUserDocuments');

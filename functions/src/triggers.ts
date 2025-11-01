@@ -219,6 +219,47 @@ export const onMatchCompleted = onDocumentUpdated(
         tx.get(userBRef),
       ]);
       
+      // Ensure user documents exist - create if missing (critical fix for rating persistence)
+      if (!userASnap.exists) {
+        logger.warn("User document missing for player A, creating default", { uidA, displayName: playerA.displayName });
+        tx.set(userARef, {
+          uid: uidA,
+          displayName: playerA.displayName || "Anonymous",
+          email: "",
+          rating: playerA.ratingAtStart || 1000,
+          stats: {
+            wins: 0,
+            losses: 0,
+            draws: 0,
+            matchesPlayed: 0,
+            correctAnswers: 0,
+            totalTimeMs: 0,
+          },
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+        });
+      }
+      
+      if (!userBSnap.exists) {
+        logger.warn("User document missing for player B, creating default", { uidB, displayName: playerB.displayName });
+        tx.set(userBRef, {
+          uid: uidB,
+          displayName: playerB.displayName || "Anonymous",
+          email: "",
+          rating: playerB.ratingAtStart || 1000,
+          stats: {
+            wins: 0,
+            losses: 0,
+            draws: 0,
+            matchesPlayed: 0,
+            correctAnswers: 0,
+            totalTimeMs: 0,
+          },
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+        });
+      }
+      
       const gamesPlayedA = userASnap.data()?.stats?.matchesPlayed ?? 0;
       const gamesPlayedB = userBSnap.data()?.stats?.matchesPlayed ?? 0;
 
