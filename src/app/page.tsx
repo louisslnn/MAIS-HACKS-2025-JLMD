@@ -2,25 +2,18 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { LoginButton } from "@/components/auth/LoginButton";
 import { Button } from "@/components/ui";
 
 export default function Home() {
   const { user, loading } = useAuth();
-  const router = useRouter();
   const [mounted, setMounted] = useState(false);
 
   // Fix hydration mismatch - only render after mount
   useEffect(() => {
     setMounted(true);
-    console.log('[Home] Mounted. User:', user, 'Loading:', loading);
   }, []);
-
-  useEffect(() => {
-    console.log('[Home] Auth state changed. User:', user, 'Loading:', loading);
-  }, [user, loading]);
 
   if (!mounted) {
     return (
