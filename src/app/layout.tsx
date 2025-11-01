@@ -19,7 +19,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "MathClash — Competitive Math Battles",
   description:
-    "Face off in real-time math battles, sharpen your skills in training mode, and climb the global MathClash leaderboard.",
+    "Face off in real-time math battles, sharpen your skills in training mode, climb the leaderboard, and connect with friends.",
 };
 
 export default function RootLayout({
@@ -48,7 +48,7 @@ export default function RootLayout({
                     Play
                   </Link>
                   <Link href="/social" className="rounded-lg px-4 py-2 transition hover:bg-surface-muted hover:text-ink">
-                    Leaderboard
+                    Social
                   </Link>
                   <Link href="/settings" className="rounded-lg px-4 py-2 transition hover:bg-surface-muted hover:text-ink">
                     Settings

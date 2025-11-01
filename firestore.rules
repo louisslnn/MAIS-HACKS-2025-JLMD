@@ -14,10 +14,17 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      allow read: if signedIn() && request.auth.uid == uid;
+      allow read: if signedIn();
       allow write: if signedIn() && request.auth.uid == uid;
       // Allow Cloud Functions to update player state
       allow update: if signedIn();
+      
+      // Friends subcollection
+      match /friends/{friendId} {
+        allow read: if signedIn() && request.auth.uid == uid;
+        allow create: if signedIn() && request.auth.uid == uid;
+        allow delete: if signedIn() && request.auth.uid == uid;
+      }
     }
 
     match /matches/{matchId} {

@@ -1,7 +1,19 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, orderBy, limit, onSnapshot } from "firebase/firestore";
+import {
+  collection,
+  query,
+  orderBy,
+  limit,
+  onSnapshot,
+  doc,
+  setDoc,
+  deleteDoc,
+  where,
+  getDocs,
+  Timestamp,
+} from "firebase/firestore";
 import { firestore } from "@/lib/firebase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
@@ -13,12 +25,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui";
-
-const friends = [
-  { id: "1", name: "Nova", status: "Online", streak: 4 },
-  { id: "2", name: "Kai", status: "In match", streak: 7 },
-  { id: "3", name: "Rin", status: "Offline", streak: 2 },
-];
+import { X, Copy, Check, Trophy, Users, Star } from "lucide-react";
 
 interface LeaderboardEntry {
   uid: string;
@@ -28,28 +35,47 @@ interface LeaderboardEntry {
     wins: number;
     losses: number;
     draws: number;
+    matchesPlayed: number;
   };
+}
+
+interface Friend {
+  uid: string;
+  displayName: string;
+  rating: number;
+  status: "online" | "in-match" | "offline";
+  addedAt: Date;
 }
 
 export default function SocialPage() {
   const { user } = useAuth();
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [friends, setFriends] = useState<Friend[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showFullLeaderboard, setShowFullLeaderboard] = useState(false);
+  const [inviteLink, setInviteLink] = useState("");
+  const [copied, setCopied] = useState(false);
 
+  // Generate invite link
+  useEffect(() => {
+    if (user) {
+      const link = `${window.location.origin}/social?invite=${user.uid}`;
+      setInviteLink(link);
+    }
+  }, [user]);
+
+  // Subscribe to global leaderboard
   useEffect(() => {
     if (!firestore) {
-      console.warn("Firebase not initialized");
-      // Don't set loading here - let it be set by the effect cleanup
-      return () => {
-        setLoading(false);
-      };
+      setLoading(false);
+      return;
     }
 
     const usersRef = collection(firestore, "users");
     const leaderboardQuery = query(
       usersRef,
       orderBy("rating", "desc"),
-      limit(50)
+      limit(100)
     );
 
     const unsubscribe = onSnapshot(
@@ -75,153 +101,521 @@ export default function SocialPage() {
 
     return () => unsubscribe();
   }, []);
+
+  // Subscribe to friends
+  useEffect(() => {
+    if (!firestore || !user) return;
+
+    const friendsRef = collection(firestore, `users/${user.uid}/friends`);
+    const friendsQuery = query(friendsRef, orderBy("addedAt", "desc"));
+
+    const unsubscribe = onSnapshot(friendsQuery, async (snapshot) => {
+      const friendsList: Friend[] = [];
+      
+      for (const friendDoc of snapshot.docs) {
+        const data = friendDoc.data();
+        // Fetch friend's current data
+        const friendUserDoc = await getDocs(
+          query(collection(firestore, "users"), where("__name__", "==", data.friendUid))
+        );
+        
+        if (!friendUserDoc.empty) {
+          const friendData = friendUserDoc.docs[0].data();
+          friendsList.push({
+            uid: data.friendUid,
+            displayName: friendData.displayName || "Anonymous",
+            rating: friendData.rating || 1000,
+            status: determineStatus(friendData),
+            addedAt: data.addedAt?.toDate() || new Date(),
+          });
+        }
+      }
+      
+      setFriends(friendsList);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  // Check for invite in URL
+  useEffect(() => {
+    if (!user || !firestore) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const inviteUid = params.get("invite");
+
+    if (inviteUid && inviteUid !== user.uid) {
+      // Add friend
+      addFriend(inviteUid);
+      // Clean up URL
+      window.history.replaceState({}, "", "/social");
+    }
+  }, [user]);
+
+  const determineStatus = (userData: any): "online" | "in-match" | "offline" => {
+    if (!userData.playerState) return "offline";
+    
+    const lastUpdated = userData.playerState.lastUpdated?.toDate();
+    if (lastUpdated && Date.now() - lastUpdated.getTime() > 5 * 60 * 1000) {
+      return "offline";
+    }
+    
+    if (userData.playerState.status === "in-match") return "in-match";
+    if (userData.playerState.status === "in-queue") return "online";
+    return "online";
+  };
+
+  const addFriend = async (friendUid: string) => {
+    if (!user || !firestore) return;
+
+    try {
+      // Add to current user's friends
+      await setDoc(doc(firestore, `users/${user.uid}/friends/${friendUid}`), {
+        friendUid,
+        addedAt: Timestamp.now(),
+      });
+
+      // Add to friend's friends (mutual friendship)
+      await setDoc(doc(firestore, `users/${friendUid}/friends/${user.uid}`), {
+        friendUid: user.uid,
+        addedAt: Timestamp.now(),
+      });
+    } catch (error) {
+      console.error("Failed to add friend:", error);
+    }
+  };
+
+  const removeFriend = async (friendUid: string) => {
+    if (!user || !firestore) return;
+
+    try {
+      await deleteDoc(doc(firestore, `users/${user.uid}/friends/${friendUid}`));
+      await deleteDoc(doc(firestore, `users/${friendUid}/friends/${user.uid}`));
+    } catch (error) {
+      console.error("Failed to remove friend:", error);
+    }
+  };
+
+  const copyInviteLink = () => {
+    navigator.clipboard.writeText(inviteLink);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const friendsLeaderboard = friends
+    .sort((a, b) => b.rating - a.rating)
+    .map((friend, index) => ({ ...friend, rank: index + 1 }));
+
+  const topTenLeaderboard = leaderboard.slice(0, 10);
+  const userRank = leaderboard.findIndex((entry) => entry.uid === user?.uid) + 1;
+  const userEntry = leaderboard.find((entry) => entry.uid === user?.uid);
+
   return (
-    <div className="space-y-12">
+    <div className="space-y-8">
       <header className="space-y-4">
-        <Badge variant="blue">Community pulse</Badge>
-        <h1>Track your squad, spark rematches, and climb the ladder.</h1>
-        <p className="max-w-2xl">
-          Friends, streaks, and rankings live in two focused panels. Presence and Elo
-          updates stream in real time so you always know who is ready to play.
+        <Badge variant="blue">Community Hub</Badge>
+        <h1 className="text-4xl font-bold">Connect, Compete, Conquer.</h1>
+        <p className="max-w-2xl text-lg text-ink-soft">
+          Challenge friends, track your progress, and climb the global rankings. Your journey to math mastery starts here.
         </p>
       </header>
 
-      <section className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-        <Card>
-          <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <CardTitle>Friends list</CardTitle>
-              <CardDescription>
-                See who is online, in a match, or on a hot streak at a glance.
-              </CardDescription>
-            </div>
-            <Button variant="secondary" size="sm">
-              Add friend
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {friends.map((friend) => (
-              <div
-                key={friend.id}
-                className="flex flex-col gap-3 rounded-[var(--radius-sm)] border border-border bg-surface px-4 py-4 text-sm text-ink sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div>
-                  <p className="text-base font-semibold text-ink">{friend.name}</p>
-                  <p className="text-sm text-ink-soft">
-                    {friend.status} · {friend.streak}-match streak
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="primary" size="sm">
-                    Rematch
-                  </Button>
-                  <Button variant="outline" size="sm">
-                    Spectate
-                  </Button>
-                </div>
+      {/* Your Stats Card */}
+      {user && userEntry && (
+        <Card className="bg-gradient-to-br from-brand/5 to-brand-secondary/5 border-brand/20">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-ink-soft mb-1">Your Rank</p>
+                <p className="text-4xl font-bold text-brand">#{userRank}</p>
               </div>
-            ))}
-            <p className="text-xs text-ink-subtle">
-              Offline players drop off automatically to keep the roster accurate.
-            </p>
+              <div className="text-right">
+                <p className="text-sm text-ink-soft mb-1">Your Rating</p>
+                <p className="text-4xl font-bold">{userEntry.rating}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-ink-soft mb-1">Record</p>
+                <p className="text-lg font-semibold">
+                  {userEntry.stats ? (
+                    <span className="text-green-600">{userEntry.stats.wins}W</span>
+                  ) : "0W"} - {" "}
+                  {userEntry.stats ? (
+                    <span className="text-red-600">{userEntry.stats.losses}L</span>
+                  ) : "0L"}
+                </p>
+              </div>
+            </div>
           </CardContent>
         </Card>
+      )}
 
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Friends List */}
         <Card>
-          <CardHeader className="space-y-2">
-            <CardTitle>Global leaderboard</CardTitle>
-            <CardDescription>
-              Watch rankings shift after every match and filter by region to scout new
-              rivals.
-            </CardDescription>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-brand" />
+                  Friends
+                </CardTitle>
+                <CardDescription>
+                  Connect with other players and track their progress
+                </CardDescription>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            {loading ? (
-              <div className="text-center py-8">
-                <p className="text-ink-soft">Loading leaderboard...</p>
+            {/* Invite Link */}
+            <div className="p-4 bg-surface-muted rounded-lg border border-border">
+              <p className="text-sm font-medium mb-2">Invite Friends</p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={inviteLink}
+                  readOnly
+                  className="flex-1 px-3 py-2 text-sm bg-surface border border-border rounded-lg"
+                />
+                <Button
+                  variant={copied ? "secondary" : "primary"}
+                  size="sm"
+                  onClick={copyInviteLink}
+                  className="flex items-center gap-2"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="h-4 w-4" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4" />
+                      Copy
+                    </>
+                  )}
+                </Button>
               </div>
-            ) : leaderboard.length === 0 ? (
+            </div>
+
+            {/* Friends List */}
+            {friends.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-ink-soft">No players yet. Be the first to play!</p>
+                <p className="text-ink-soft">No friends yet. Share your invite link to get started!</p>
               </div>
             ) : (
-              <div className="overflow-hidden rounded-[var(--radius-sm)] border border-border">
-                <table className="min-w-full divide-y divide-border text-left text-sm text-ink">
-                  <thead className="bg-surface-muted text-xs uppercase tracking-[0.18em] text-ink-subtle">
-                    <tr>
-                      <th className="px-4 py-3">Rank</th>
-                      <th className="px-4 py-3">Player</th>
-                      <th className="px-4 py-3">Rating</th>
-                      <th className="px-4 py-3">Record</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/70">
-                    {leaderboard.map((player, index) => {
-                      const isCurrentUser = user && player.uid === user.uid;
-                      return (
-                        <tr 
-                          key={player.uid} 
-                          className={`hover:bg-surface-muted ${isCurrentUser ? "bg-brand-secondary/10" : ""}`}
-                        >
-                          <td className="px-4 py-3 font-semibold text-ink">
-                            #{index + 1}
-                          </td>
-                          <td className="px-4 py-3">
-                            {player.displayName}
-                            {isCurrentUser && (
-                              <span className="ml-2 text-xs text-brand">(You)</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 font-medium text-brand">
-                            {player.rating}
-                          </td>
-                          <td className="px-4 py-3 text-xs text-ink-subtle">
-                            {player.stats ? (
-                              <>
-                                {player.stats.wins}W-{player.stats.losses}L-{player.stats.draws}D
-                              </>
-                            ) : (
-                              "—"
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+              <div className="space-y-2">
+                {friends.map((friend) => (
+                  <div
+                    key={friend.uid}
+                    className="flex items-center justify-between p-3 rounded-lg border border-border bg-surface hover:bg-surface-muted transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <div className="h-10 w-10 rounded-full bg-gradient-to-br from-brand to-brand-secondary flex items-center justify-center text-white font-bold">
+                          {friend.displayName.charAt(0).toUpperCase()}
+                        </div>
+                        <div
+                          className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-surface ${
+                            friend.status === "online"
+                              ? "bg-green-500"
+                              : friend.status === "in-match"
+                              ? "bg-yellow-500"
+                              : "bg-gray-400"
+                          }`}
+                        />
+                      </div>
+                      <div>
+                        <p className="font-semibold">{friend.displayName}</p>
+                        <p className="text-sm text-ink-soft">
+                          {friend.rating} Elo • {friend.status === "in-match" ? "In Match" : friend.status === "online" ? "Online" : "Offline"}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => removeFriend(friend.uid)}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                ))}
               </div>
             )}
-            <p className="text-xs text-ink-subtle">
-              Ratings update the moment a match ends, so streaks and placements are
-              always current.
-            </p>
           </CardContent>
         </Card>
-      </section>
 
+        {/* Friends Leaderboard */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Star className="h-5 w-5 text-yellow-500" />
+              Friends Leaderboard
+            </CardTitle>
+            <CardDescription>
+              See how you stack up against your friends
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {friendsLeaderboard.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-ink-soft">Add friends to see your rankings!</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {friendsLeaderboard.map((friend) => (
+                  <div
+                    key={friend.uid}
+                    className="flex items-center justify-between p-3 rounded-lg border border-border bg-surface"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-surface-muted font-bold text-sm">
+                        #{friend.rank}
+                      </div>
+                      <div>
+                        <p className="font-semibold">{friend.displayName}</p>
+                      </div>
+                    </div>
+                    <p className="font-bold text-brand">{friend.rating}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Global Leaderboard */}
       <Card>
-        <CardHeader className="space-y-2">
-          <CardTitle>Keep the loop social</CardTitle>
-          <CardDescription>
-            Clean actions encourage rematches and quick practice hops straight from
-            the leaderboard.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-3">
-          {[
-            "Send a rematch invite instantly once the final round locks.",
-            "Spectate friends live without interrupting their match.",
-            "Share invite links that expire quickly to keep rooms secure.",
-          ].map((note) => (
-            <div
-              key={note}
-              className="rounded-[var(--radius-sm)] border border-border bg-surface-muted px-4 py-3 text-sm text-ink-soft"
-            >
-              {note}
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Trophy className="h-6 w-6 text-yellow-500" />
+                Global Leaderboard
+              </CardTitle>
+              <CardDescription>
+                Top players worldwide, updated in real-time
+              </CardDescription>
             </div>
-          ))}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setShowFullLeaderboard(true)}
+            >
+              View Top 100
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="text-center py-8">
+              <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-brand border-r-transparent"></div>
+              <p className="text-ink-soft mt-2">Loading leaderboard...</p>
+            </div>
+          ) : topTenLeaderboard.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-ink-soft">No players yet. Be the first to play!</p>
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-lg border border-border">
+              <table className="min-w-full divide-y divide-border">
+                <thead className="bg-surface-muted">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-ink-subtle uppercase tracking-wider">
+                      Rank
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-ink-subtle uppercase tracking-wider">
+                      Player
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-ink-subtle uppercase tracking-wider">
+                      Rating
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-ink-subtle uppercase tracking-wider">
+                      Record
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border bg-surface">
+                  {topTenLeaderboard.map((player, index) => {
+                    const isCurrentUser = user && player.uid === user.uid;
+                    return (
+                      <tr
+                        key={player.uid}
+                        className={`hover:bg-surface-muted transition-colors ${
+                          isCurrentUser ? "bg-brand/10" : ""
+                        }`}
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            {index < 3 ? (
+                              <Trophy
+                                className={`h-5 w-5 ${
+                                  index === 0
+                                    ? "text-yellow-500"
+                                    : index === 1
+                                    ? "text-gray-400"
+                                    : "text-orange-600"
+                                }`}
+                              />
+                            ) : (
+                              <span className="font-semibold text-ink">
+                                #{index + 1}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-brand to-brand-secondary flex items-center justify-center text-white font-bold text-sm">
+                              {player.displayName.charAt(0).toUpperCase()}
+                            </div>
+                            <span className="font-medium">
+                              {player.displayName}
+                              {isCurrentUser && (
+                                <span className="ml-2 text-xs text-brand font-semibold">
+                                  (You)
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="text-lg font-bold text-brand">
+                            {player.rating}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-ink-soft">
+                          {player.stats ? (
+                            <span>
+                              <span className="text-green-600">{player.stats.wins}W</span> -{" "}
+                              <span className="text-red-600">{player.stats.losses}L</span> -{" "}
+                              <span className="text-gray-500">{player.stats.draws}D</span>
+                            </span>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {/* Full Leaderboard Modal */}
+      {showFullLeaderboard && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-surface rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-6 border-b border-border">
+              <div>
+                <h2 className="text-2xl font-bold flex items-center gap-2">
+                  <Trophy className="h-6 w-6 text-yellow-500" />
+                  Top 100 Players
+                </h2>
+                <p className="text-sm text-ink-soft mt-1">Global rankings</p>
+              </div>
+              <button
+                onClick={() => setShowFullLeaderboard(false)}
+                className="p-2 hover:bg-surface-muted rounded-lg transition-colors"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            <div className="overflow-y-auto flex-1">
+              <table className="min-w-full divide-y divide-border">
+                <thead className="bg-surface-muted sticky top-0">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-ink-subtle uppercase tracking-wider">
+                      Rank
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-ink-subtle uppercase tracking-wider">
+                      Player
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-ink-subtle uppercase tracking-wider">
+                      Rating
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-ink-subtle uppercase tracking-wider">
+                      Record
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-ink-subtle uppercase tracking-wider">
+                      Games
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {leaderboard.map((player, index) => {
+                    const isCurrentUser = user && player.uid === user.uid;
+                    return (
+                      <tr
+                        key={player.uid}
+                        className={`hover:bg-surface-muted transition-colors ${
+                          isCurrentUser ? "bg-brand/10" : ""
+                        }`}
+                      >
+                        <td className="px-6 py-3 whitespace-nowrap">
+                          {index < 3 ? (
+                            <Trophy
+                              className={`h-5 w-5 ${
+                                index === 0
+                                  ? "text-yellow-500"
+                                  : index === 1
+                                  ? "text-gray-400"
+                                  : "text-orange-600"
+                              }`}
+                            />
+                          ) : (
+                            <span className="font-semibold text-sm">
+                              #{index + 1}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-3 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-brand to-brand-secondary flex items-center justify-center text-white font-bold text-sm">
+                              {player.displayName.charAt(0).toUpperCase()}
+                            </div>
+                            <span className="font-medium text-sm">
+                              {player.displayName}
+                              {isCurrentUser && (
+                                <span className="ml-2 text-xs text-brand font-semibold">
+                                  (You)
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-3 whitespace-nowrap">
+                          <span className="font-bold text-brand">
+                            {player.rating}
+                          </span>
+                        </td>
+                        <td className="px-6 py-3 whitespace-nowrap text-sm">
+                          {player.stats ? (
+                            <span>
+                              <span className="text-green-600">{player.stats.wins}W</span> -{" "}
+                              <span className="text-red-600">{player.stats.losses}L</span> -{" "}
+                              <span className="text-gray-500">{player.stats.draws}D</span>
+                            </span>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td className="px-6 py-3 whitespace-nowrap text-sm text-ink-soft">
+                          {player.stats?.matchesPlayed || 0}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
