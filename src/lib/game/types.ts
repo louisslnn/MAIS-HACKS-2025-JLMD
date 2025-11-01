@@ -13,6 +13,12 @@ export interface PlayerSummary {
   surrendered: boolean;
 }
 
+export interface RatingChangeEntry {
+  oldRating: number;
+  newRating: number;
+  delta: number;
+}
+
 export interface MatchSettings {
   rounds: number;
   roundDurationMs: number;
@@ -31,6 +37,8 @@ export interface MatchDocument {
   createdAt?: string;
   updatedAt?: string;
   seed?: string;
+  ratingChanges?: Record<string, RatingChangeEntry>;
+  ratingProcessed?: boolean;
 }
 
 export interface CanonicalPrompt {

@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { doc, getDoc } from "firebase/firestore";
-import { firestore } from "@/lib/firebase/client";
+
 import { Button } from "@/components/ui";
 import type { MatchDocument } from "@/lib/game/types";
 
@@ -25,78 +24,40 @@ export function MatchResults({ match, userId, onPlayAgain }: MatchResultsProps) 
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchRatingChange() {
-      if (!firestore || !userId || !match.id) return;
+    if (!userId) return;
 
-      try {
-        const matchRef = doc(firestore, "matches", match.id);
-        
-        // Check if rating changes are already stored in the match document
-        const matchData = match as any;
-        console.log('[MatchResults] Initial match data:', { matchId: match.id, hasRatingChanges: !!matchData.ratingChanges, userId });
-        
-        if (matchData.ratingChanges && matchData.ratingChanges[userId]) {
-          const change = matchData.ratingChanges[userId];
-          console.log('[MatchResults] Found rating change immediately:', change);
-          setRatingChange({
-            oldRating: change.oldRating,
-            newRating: change.newRating,
-            delta: change.delta,
-          });
-          setLoading(false);
-          return;
-        }
-        
-        // Otherwise, poll the match document for rating changes (backend is calculating)
-        let attempts = 0;
-        const maxAttempts = 10;
-        let delay = 300; // Start with 300ms
-        
-        while (attempts < maxAttempts) {
-          console.log(`[MatchResults] Polling attempt ${attempts + 1}/${maxAttempts}...`);
-          const matchSnap = await getDoc(matchRef);
-          
-          if (matchSnap.exists()) {
-            const matchData = matchSnap.data() as any;
-            console.log('[MatchResults] Polled match data:', { hasRatingChanges: !!matchData.ratingChanges, ratingProcessed: matchData.ratingProcessed });
-            
-            // Check if rating changes are now available
-            if (matchData.ratingChanges && matchData.ratingChanges[userId]) {
-              const change = matchData.ratingChanges[userId];
-              console.log('[MatchResults] Found rating change after polling:', change);
-              setRatingChange({
-                oldRating: change.oldRating,
-                newRating: change.newRating,
-                delta: change.delta,
-              });
-              setLoading(false);
-              return;
-            }
-          }
-          
-          // Wait before retrying (exponential backoff)
-          await new Promise(resolve => setTimeout(resolve, delay));
-          delay = Math.min(delay * 1.5, 2000); // Max 2 seconds
-          attempts++;
-        }
-        
-        // Fallback: use player's ratingAtStart if rating changes not available
-        console.warn('[MatchResults] Rating changes not found after max attempts. Using fallback.');
-        const player = match.players[userId];
-        const oldRating = player?.ratingAtStart || 1000;
-        setRatingChange({
-          oldRating,
-          newRating: oldRating,
-          delta: 0,
-        });
-      } catch (error) {
-        console.error("Failed to fetch rating change:", error);
-      } finally {
-        setLoading(false);
-      }
+    const matchData = match as unknown as {
+      ratingChanges?: Record<string, RatingChange>;
+      ratingProcessed?: boolean;
+    };
+
+    const change = matchData.ratingChanges?.[userId];
+
+    if (change) {
+      setRatingChange({
+        oldRating: change.oldRating,
+        newRating: change.newRating,
+        delta: change.delta,
+      });
+      setLoading(false);
+      return;
     }
 
-    fetchRatingChange();
+    if (matchData.ratingProcessed === true) {
+      const player = match.players[userId];
+      if (player) {
+        setRatingChange({
+          oldRating: player.ratingAtStart,
+          newRating: player.ratingAtStart,
+          delta: 0,
+        });
+      }
+      setLoading(false);
+      return;
+    }
+
+    setRatingChange(null);
+    setLoading(true);
   }, [match, userId]);
 
   const player = match.players[userId];
@@ -121,6 +82,9 @@ export function MatchResults({ match, userId, onPlayAgain }: MatchResultsProps) 
       {/* Result Header */}
       <div className={`rounded-2xl ${bgColor} p-8 text-center`}>
         <h2 className={`text-4xl font-bold ${resultColor}`}>{result}</h2>
+        {loading && (
+          <p className="mt-4 text-sm text-ink-soft">Calculating rating change...</p>
+        )}
         {!loading && ratingChange && (
           <div className="mt-4">
             <p className="text-sm text-ink-soft">Rating Change</p>
@@ -196,4 +160,3 @@ export function MatchResults({ match, userId, onPlayAgain }: MatchResultsProps) 
     </div>
   );
 }
-

@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { LoginButton } from "@/components/auth/LoginButton";
 import { Button } from "@/components/ui";
 
 export default function Home() {
   const { user, loading } = useAuth();
+  const router = useRouter();
 
   return (
     <div className="relative min-h-[calc(100vh-200px)] flex items-center justify-center overflow-hidden">
@@ -44,18 +46,23 @@ export default function Home() {
             </div>
           ) : user ? (
             <div className="flex flex-col sm:flex-row items-center gap-4">
-              <Button size="lg" className="w-full sm:w-auto text-lg px-8 py-6" asChild>
-                <Link href="/play">
-                  Enter Arena
-                  <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                  </svg>
-                </Link>
+              <Button 
+                size="lg" 
+                className="w-full sm:w-auto text-lg px-8 py-6"
+                onClick={() => router.push('/play')}
+              >
+                Enter Arena
+                <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
               </Button>
-              <Button size="lg" variant="outline" className="w-full sm:w-auto text-lg px-8 py-6" asChild>
-                <Link href="/social">
-                  View Leaderboard
-                </Link>
+              <Button 
+                size="lg" 
+                variant="outline" 
+                className="w-full sm:w-auto text-lg px-8 py-6"
+                onClick={() => router.push('/social')}
+              >
+                View Leaderboard
               </Button>
             </div>
           ) : (
