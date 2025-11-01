@@ -55,23 +55,23 @@ class IntegralGenerator:
             raise ValueError("OPENAI_API_KEY not found in environment or provided parameter")
         
         self.client = OpenAI(api_key=api_key)
-        self.questions_file = Path(__file__).parent.parent / "questions.json"
+        self.integrals_file = Path(__file__).parent.parent / "integrals.json"
     
-    def _load_questions(self) -> Dict:
-        """Load existing questions from questions.json."""
-        if self.questions_file.exists():
-            with open(self.questions_file, 'r', encoding='utf-8') as f:
+    def _load_integrals(self) -> Dict:
+        """Load existing integrals from integrals.json."""
+        if self.integrals_file.exists():
+            with open(self.integrals_file, 'r', encoding='utf-8') as f:
                 return json.load(f)
         return {"integrals": []}
     
-    def _save_questions(self, questions_data: Dict):
-        """Save questions to questions.json."""
-        with open(self.questions_file, 'w', encoding='utf-8') as f:
-            json.dump(questions_data, f, indent=2, ensure_ascii=False)
+    def _save_integrals(self, integrals_data: Dict):
+        """Save integrals to integrals.json."""
+        with open(self.integrals_file, 'w', encoding='utf-8') as f:
+            json.dump(integrals_data, f, indent=4, ensure_ascii=False)
     
-    def _get_next_id(self, questions_data: Dict) -> int:
+    def _get_next_id(self, integrals_data: Dict) -> int:
         """Get the next available ID for integrals."""
-        integrals = questions_data.get("integrals", [])
+        integrals = integrals_data.get("integrals", [])
         if not integrals:
             return 1
         return max(q.get("id", 0) for q in integrals) + 1
@@ -102,15 +102,15 @@ Generate {count} integral calculus problem{'s' if count > 1 else ''} at the **{d
 ## Requirements
 1. **Problem Format**: 
    - Use LaTeX notation for the integral
-   - Format: `\\int{{...dx}}` (use double braces for JSON compatibility)
-   - Example: `\\int{{4x^6 - 2x^3 + 7x - 4\\,dx}}`
+   - Format: `$\\int ... \\, dx$` (use dollar signs, standard LaTeX format)
+   - Example: `$\\int (4x^6 - 2x^3 + 7x - 4) \\, dx$`
 
 2. **Answer Format**:
    - Provide the complete solution in LaTeX
-   - Include the integration constant `+ c` at the end
-   - Use double braces: `{{...}}`
+   - Include the integration constant `+ c` or `+ C` at the end
+   - Use dollar signs: `$...$` (standard LaTeX format, NOT double braces)
    - Format fractions as `\\frac{{numerator}}{{denominator}}`
-   - Example: `{{\\frac{{4}}{{7}}x^7 - \\frac{{1}}{{2}}x^4 + \\frac{{7}}{{2}}x^2 - 4x + c}}`
+   - Example: `$\\frac{{4}}{{7}}x^7 - \\frac{{1}}{{2}}x^4 + \\frac{{7}}{{2}}x^2 - 4x + c$`
 
 3. **Difficulty Guidelines**:
    - **Easy**: Basic power rule, simple polynomials, no advanced techniques
@@ -127,20 +127,22 @@ Return a JSON array with this structure:
 {{
     "integrals": [
         {{
-            "problem": "LaTeX integral expression with double braces",
-            "answer": "LaTeX solution with double braces and +c"
+            "problem": "LaTeX integral expression with dollar signs",
+            "answer": "LaTeX solution with dollar signs and +c or +C"
         }}
     ]
 }}
 
 ## Important Notes
-- Use **double braces** `{{{{` and `}}}}` in LaTeX for JSON compatibility
-- Always include `+ c` in the answer
+- Use **dollar signs** `$...$` in LaTeX for standard format (like: `$\\int x^3 \\, dx$`)
+- Always include `+ c` or `+ C` in the answer
 - Ensure problems are solvable and well-formed
 - Use proper LaTeX syntax for all mathematical expressions
 - Fraction format: `\\frac{{numerator}}{{denominator}}`
 - Power format: `x^{{n}}`
-- Integral format: `\\int{{...dx}}`
+- Integral format: `\\int ... \\, dx` (with spacing before dx)
+- Example problem: `$\\int x^3 \\, dx$`
+- Example answer: `$\\frac{{x^4}}{{4}} + c$`
 
 Generate {count} {difficulty} integral problem{'s' if count > 1 else ''} now:"""
         
@@ -230,9 +232,9 @@ Generate {count} {difficulty} integral problem{'s' if count > 1 else ''} now:"""
         
         return results
     
-    def add_to_questions_json(self, problem: str, answer: str, question_id: Optional[int] = None) -> int:
+    def add_to_integrals_json(self, problem: str, answer: str, question_id: Optional[int] = None) -> int:
         """
-        Add a generated integral to questions.json.
+        Add a generated integral to integrals.json.
         
         Args:
             problem: LaTeX problem string
@@ -242,15 +244,15 @@ Generate {count} {difficulty} integral problem{'s' if count > 1 else ''} now:"""
         Returns:
             The ID assigned to the question
         """
-        questions_data = self._load_questions()
+        integrals_data = self._load_integrals()
         
         # Ensure integrals array exists
-        if "integrals" not in questions_data:
-            questions_data["integrals"] = []
+        if "integrals" not in integrals_data:
+            integrals_data["integrals"] = []
         
         # Get next ID
         if question_id is None:
-            question_id = self._get_next_id(questions_data)
+            question_id = self._get_next_id(integrals_data)
         
         # Create question entry
         question_entry = {
@@ -260,17 +262,17 @@ Generate {count} {difficulty} integral problem{'s' if count > 1 else ''} now:"""
         }
         
         # Add to integrals array
-        questions_data["integrals"].append(question_entry)
+        integrals_data["integrals"].append(question_entry)
         
         # Save to file
-        self._save_questions(questions_data)
+        self._save_integrals(integrals_data)
         
         return question_id
     
     def generate_and_add(self, difficulty: str = "medium", count: int = 1, 
                         api_key: Optional[str] = None) -> List[int]:
         """
-        Generate integrals and automatically add them to questions.json.
+        Generate integrals and automatically add them to integrals.json.
         
         Args:
             difficulty: Difficulty level ("easy", "medium", "hard")
@@ -283,10 +285,10 @@ Generate {count} {difficulty} integral problem{'s' if count > 1 else ''} now:"""
         # Generate integrals
         integrals = self.generate_multiple_integrals(difficulty, count, api_key)
         
-        # Add to questions.json
+        # Add to integrals.json
         question_ids = []
         for integral in integrals:
-            qid = self.add_to_questions_json(
+            qid = self.add_to_integrals_json(
                 problem=integral["problem"],
                 answer=integral["answer"]
             )
@@ -325,11 +327,9 @@ if __name__ == "__main__":
         print(f"\nProblem: {integral['problem']}")
         print(f"Answer:  {integral['answer']}")
         
-        # Ask if user wants to add to questions.json
-        add_to_file = input("\nAdd this to questions.json? (y/n): ").strip().lower()
-        if add_to_file == 'y':
-            qid = generator.add_to_questions_json(integral['problem'], integral['answer'])
-            print(f"✓ Added to questions.json with ID: {qid}")
+        # Automatically add to integrals.json
+        qid = generator.add_to_integrals_json(integral['problem'], integral['answer'])
+        print(f"\n✓ Added to integrals.json with ID: {qid}")
         
     except ValueError as e:
         print(f"\nError: {e}")
