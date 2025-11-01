@@ -125,11 +125,11 @@ Start with {{"integrals":[ and end with ]}}"""
 
 
 def main():
-    print("🔢 Integral Problem Generator")
-    print(f"📊 Generating {NUM_PROBLEMS} problems: {DIFFICULTY}")
-    print(f"📄 Output: {OUTPUT_PATH}")
-    print(f"🔧 Model: {MODEL}")
-    print(f"➕ Append mode: {'ON' if APPEND_MODE else 'OFF'}")
+    print("Integral Problem Generator")
+    print(f"Generating {NUM_PROBLEMS} problems: {DIFFICULTY}")
+    print(f"Output: {OUTPUT_PATH}")
+    print(f"Model: {MODEL}")
+    print(f"Append mode: {'ON' if APPEND_MODE else 'OFF'}")
     print()
     
     # Check for API key
@@ -151,8 +151,8 @@ def main():
         if APPEND_MODE:
             last_id = get_last_id(OUTPUT_PATH)
             start_id = last_id + 1
-            print(f"📖 Found existing integrals (last ID: {last_id})")
-            print(f"🆔 New IDs will start from: {start_id}")
+            print(f"Found existing integrals (last ID: {last_id})")
+            print(f"New IDs will start from: {start_id}")
             print()
         else:
             start_id = 1
