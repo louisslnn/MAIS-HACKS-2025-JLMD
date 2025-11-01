@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 import { Button } from "@/components/ui";
 import type { MatchDocument } from "@/lib/game/types";
@@ -19,7 +19,6 @@ interface RatingChange {
 }
 
 export function MatchResults({ match, userId, onPlayAgain }: MatchResultsProps) {
-  const router = useRouter();
   const [ratingChange, setRatingChange] = useState<RatingChange | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -150,11 +149,15 @@ export function MatchResults({ match, userId, onPlayAgain }: MatchResultsProps) 
         <Button size="lg" onClick={onPlayAgain}>
           Play Again
         </Button>
-        <Button size="lg" variant="outline" onClick={() => router.push("/social")}>
-          View Leaderboard
+        <Button size="lg" variant="outline" asChild>
+          <Link href="/social">
+            View Social
+          </Link>
         </Button>
-        <Button size="lg" variant="outline" onClick={() => router.push("/")}>
-          Home
+        <Button size="lg" variant="outline" asChild>
+          <Link href="/">
+            Home
+          </Link>
         </Button>
       </div>
     </div>
