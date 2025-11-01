@@ -285,10 +285,23 @@ export const onMatchCompleted = onDocumentUpdated(
         createdAt: serverTimestamp(),
       });
 
+      // Store rating changes in match document for instant display
       tx.update(matchRef, {
         ratingProcessed: true,
         winner: winner ?? null,
         updatedAt: now,
+        ratingChanges: {
+          [uidA]: {
+            oldRating: playerA.ratingAtStart,
+            newRating: newRatingA,
+            delta: newRatingA - playerA.ratingAtStart,
+          },
+          [uidB]: {
+            oldRating: playerB.ratingAtStart,
+            newRating: newRatingB,
+            delta: newRatingB - playerB.ratingAtStart,
+          },
+        },
       });
 
       const leaderboardRef = db

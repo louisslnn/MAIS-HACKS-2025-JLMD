@@ -8,11 +8,19 @@
 const admin = require('firebase-admin');
 require('dotenv').config({ path: '.env.local' });
 
-const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
-  ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
-  : require('../service-account.json');
-
+// Initialize Firebase Admin
 if (!admin.apps.length) {
+  const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
+    ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+    : {
+        type: 'service_account',
+        project_id: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+        private_key_id: process.env.FIREBASE_ADMIN_PRIVATE_KEY_ID,
+        private_key: process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+        client_email: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
+        client_id: process.env.FIREBASE_ADMIN_CLIENT_ID,
+      };
+
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
     projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
@@ -25,50 +33,51 @@ async function migrateRatings() {
   try {
     console.log('🔄 Starting rating migration...\n');
     
-    // Get all users with 1500 rating (old default)
+    // Get ALL users and reset to 1000 (as requested)
     const usersRef = db.collection('users');
-    const snapshot = await usersRef.where('rating', '==', 1500).get();
+    const snapshot = await usersRef.get();
     
     if (snapshot.empty) {
-      console.log('✅ No users found with 1500 rating. Migration not needed.');
+      console.log('✅ No users found.');
       return;
     }
     
-    console.log(`📊 Found ${snapshot.size} users with 1500 rating\n`);
+    console.log(`📊 Found ${snapshot.size} users\n`);
     
-    // Batch update users
-    const batch = db.batch();
-    let count = 0;
+    // Process in batches of 500 (Firestore limit)
+    let totalCount = 0;
+    let batchCount = 0;
+    let batch = db.batch();
     
-    snapshot.forEach((doc) => {
+    for (const doc of snapshot.docs) {
       const data = doc.data();
-      const gamesPlayed = data.stats?.matchesPlayed || 0;
+      const currentRating = data.rating || 1500;
       
-      // Only migrate users who haven't played many games yet
-      if (gamesPlayed <= 5) {
-        batch.update(doc.ref, {
-          rating: 1000,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-        console.log(`  → ${data.displayName || doc.id}: 1500 → 1000 (${gamesPlayed} games)`);
-        count++;
-      } else {
-        console.log(`  ⊘ ${data.displayName || doc.id}: Keeping 1500 (${gamesPlayed} games played)`);
+      batch.update(doc.ref, {
+        rating: 1000,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      
+      console.log(`  → ${data.displayName || doc.id}: ${currentRating} → 1000`);
+      batchCount++;
+      totalCount++;
+      
+      // Commit every 500 operations
+      if (batchCount >= 500) {
+        await batch.commit();
+        console.log(`  ✅ Committed batch of ${batchCount} updates\n`);
+        batch = db.batch();
+        batchCount = 0;
       }
-    });
-    
-    if (count > 0) {
-      await batch.commit();
-      console.log(`\n✅ Successfully migrated ${count} users to 1000 rating`);
-    } else {
-      console.log('\n✅ No users needed migration (all have 5+ games)');
     }
     
-    // Show summary
-    console.log('\n📈 Migration Summary:');
-    console.log(`   Total users checked: ${snapshot.size}`);
-    console.log(`   Users migrated: ${count}`);
-    console.log(`   Users kept at 1500: ${snapshot.size - count}`);
+    // Commit remaining
+    if (batchCount > 0) {
+      await batch.commit();
+      console.log(`  ✅ Committed final batch of ${batchCount} updates\n`);
+    }
+    
+    console.log(`\n✅ Successfully reset ${totalCount} users to 1000 rating`);
     
   } catch (error) {
     console.error('❌ Error migrating ratings:', error);

@@ -4,4 +4,4 @@ export { onRoundLocked, onMatchCompleted } from "./triggers";
 export { lockOverdueRounds, detectInactivePlayers } from "./schedulers";
 export { getGameFeedback } from "./feedback";
 export { forfeitMatch } from "./forfeit";
-export { cleanupOldMatches } from "./admin";
+export { cleanupOldMatches, resetAllRatings } from "./admin";

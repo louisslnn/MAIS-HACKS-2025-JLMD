@@ -2,8 +2,71 @@ import { Timestamp } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 
-import { db, collections, getQueueRef } from "./config";
+import { db, collections, getQueueRef, serverTimestamp } from "./config";
 import type { MatchDocument } from "./lib/types";
+
+/**
+ * Reset all users to 1000 rating (Chess.com baseline)
+ */
+export const resetAllRatings = onCall(
+  { enforceAppCheck: false, region: "us-central1" },
+  async () => {
+    try {
+      logger.info("Starting global rating reset to 1000");
+      
+      const usersRef = db.collection(collections.users);
+      const snapshot = await usersRef.get();
+      
+      if (snapshot.empty) {
+        return { success: true, count: 0, message: "No users found" };
+      }
+      
+      // Process in batches
+      let totalCount = 0;
+      let batchCount = 0;
+      let batch = db.batch();
+      
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
+        const currentRating = data.rating || 1500;
+        
+        batch.update(doc.ref, {
+          rating: 1000,
+          updatedAt: serverTimestamp(),
+        });
+        
+        logger.info(`Reset ${data.displayName || doc.id}: ${currentRating} → 1000`);
+        batchCount++;
+        totalCount++;
+        
+        // Commit every 500 operations (Firestore limit)
+        if (batchCount >= 500) {
+          await batch.commit();
+          logger.info(`Committed batch of ${batchCount} updates`);
+          batch = db.batch();
+          batchCount = 0;
+        }
+      }
+      
+      // Commit remaining
+      if (batchCount > 0) {
+        await batch.commit();
+        logger.info(`Committed final batch of ${batchCount} updates`);
+      }
+      
+      logger.info(`Successfully reset ${totalCount} users to 1000 rating`);
+      
+      return {
+        success: true,
+        count: totalCount,
+        message: `Reset ${totalCount} users to 1000 rating`,
+      };
+    } catch (error) {
+      logger.error("Error resetting ratings:", error);
+      throw new HttpsError("internal", "Failed to reset ratings");
+    }
+  }
+);
 
 /**
  * Admin function to clean up old/abandoned matches and reset player states

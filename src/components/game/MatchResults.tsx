@@ -29,29 +29,39 @@ export function MatchResults({ match, userId, onPlayAgain }: MatchResultsProps) 
       if (!firestore || !userId || !match.id) return;
 
       try {
-        const userRef = doc(firestore, "users", userId);
-        const player = match.players[userId];
-        const oldRating = player?.ratingAtStart || 1000;
+        const matchRef = doc(firestore, "matches", match.id);
         
-        // Wait for rating to be processed by polling with exponential backoff
+        // Check if rating changes are already stored in the match document
+        const matchData = match as any;
+        if (matchData.ratingChanges && matchData.ratingChanges[userId]) {
+          const change = matchData.ratingChanges[userId];
+          setRatingChange({
+            oldRating: change.oldRating,
+            newRating: change.newRating,
+            delta: change.delta,
+          });
+          setLoading(false);
+          return;
+        }
+        
+        // Otherwise, poll the match document for rating changes (backend is calculating)
         let attempts = 0;
         const maxAttempts = 10;
-        let delay = 500; // Start with 500ms
+        let delay = 300; // Start with 300ms
         
         while (attempts < maxAttempts) {
-          const userSnap = await getDoc(userRef);
+          const matchSnap = await getDoc(matchRef);
           
-          if (userSnap.exists()) {
-            const userData = userSnap.data();
-            const currentRating = userData.rating || 1000;
-            const delta = currentRating - oldRating;
+          if (matchSnap.exists()) {
+            const matchData = matchSnap.data() as any;
             
-            // If rating changed or we've tried enough times, use the value
-            if (delta !== 0 || attempts >= maxAttempts - 1) {
+            // Check if rating changes are now available
+            if (matchData.ratingChanges && matchData.ratingChanges[userId]) {
+              const change = matchData.ratingChanges[userId];
               setRatingChange({
-                oldRating,
-                newRating: currentRating,
-                delta,
+                oldRating: change.oldRating,
+                newRating: change.newRating,
+                delta: change.delta,
               });
               setLoading(false);
               return;
@@ -60,21 +70,18 @@ export function MatchResults({ match, userId, onPlayAgain }: MatchResultsProps) 
           
           // Wait before retrying (exponential backoff)
           await new Promise(resolve => setTimeout(resolve, delay));
-          delay = Math.min(delay * 1.5, 3000); // Max 3 seconds
+          delay = Math.min(delay * 1.5, 2000); // Max 2 seconds
           attempts++;
         }
         
-        // Fallback: show no change if rating never updated
-        const userSnap = await getDoc(userRef);
-        if (userSnap.exists()) {
-          const userData = userSnap.data();
-          const currentRating = userData.rating || 1000;
-          setRatingChange({
-            oldRating,
-            newRating: currentRating,
-            delta: currentRating - oldRating,
-          });
-        }
+        // Fallback: use player's ratingAtStart if rating changes not available
+        const player = match.players[userId];
+        const oldRating = player?.ratingAtStart || 1000;
+        setRatingChange({
+          oldRating,
+          newRating: oldRating,
+          delta: 0,
+        });
       } catch (error) {
         console.error("Failed to fetch rating change:", error);
       } finally {

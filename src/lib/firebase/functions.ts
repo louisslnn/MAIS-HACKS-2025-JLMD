@@ -99,3 +99,14 @@ export interface CleanupOldMatchesResponse {
 export const cleanupOldMatches: HttpsCallable<{}, CleanupOldMatchesResponse> = 
   httpsCallable(functions, 'cleanupOldMatches');
 
+export interface ResetAllRatingsResponse {
+  success: boolean;
+  count: number;
+  message: string;
+}
+
+/**
+ * Admin function: Reset all users to 1000 Elo rating
+ */
+export const resetAllRatings: HttpsCallable<{}, ResetAllRatingsResponse> = 
+  httpsCallable(functions, 'resetAllRatings');

@@ -1,121 +1,93 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useAuth } from "@/components/auth/AuthProvider";
-import { Button } from "@/components/ui";
-import { cleanupOldMatches } from "@/lib/firebase/functions";
+import { useState } from 'react';
+import { cleanupOldMatches, resetAllRatings } from '@/lib/firebase/functions';
+import { Button } from '@/components/ui';
 
 export default function AdminPage() {
-  const { user, loading } = useAuth();
-  const [cleaning, setCleaning] = useState(false);
-  const [result, setResult] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [isRunningCleanup, setIsRunningCleanup] = useState(false);
+  const [isRunningReset, setIsRunningReset] = useState(false);
+  const [cleanupResult, setCleanupResult] = useState<string | null>(null);
+  const [resetResult, setResetResult] = useState<string | null>(null);
 
-  const handleCleanup = async () => {
-    if (!confirm("This will close all old matches and reset player states. Continue?")) {
-      return;
-    }
-
-    setCleaning(true);
-    setError(null);
-    setResult(null);
-
+  async function runCleanup() {
+    setIsRunningCleanup(true);
+    setCleanupResult(null);
+    
     try {
       const response = await cleanupOldMatches();
-      setResult(response.data);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Cleanup failed";
-      setError(errorMessage);
+      setCleanupResult(JSON.stringify(response.data, null, 2));
+    } catch (error) {
+      setCleanupResult(`Error: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
-      setCleaning(false);
+      setIsRunningCleanup(false);
     }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-ink-soft">Loading...</p>
-      </div>
-    );
   }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-ink mb-4">Admin Panel</h1>
-          <p className="text-ink-soft">Please sign in to access admin functions</p>
-        </div>
-      </div>
-    );
+  async function runResetRatings() {
+    if (!confirm('This will reset ALL users to 1000 Elo. Are you sure?')) {
+      return;
+    }
+    
+    setIsRunningReset(true);
+    setResetResult(null);
+    
+    try {
+      const response = await resetAllRatings();
+      setResetResult(JSON.stringify(response.data, null, 2));
+    } catch (error) {
+      setResetResult(`Error: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setIsRunningReset(false);
+    }
   }
 
   return (
-    <div className="min-h-screen bg-surface p-8">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold text-ink mb-8">Admin Panel</h1>
+    <div className="container mx-auto py-8 px-4 max-w-4xl">
+      <h1 className="text-3xl font-bold mb-6">Admin Panel</h1>
+      
+      <div className="space-y-6">
+        <div className="border border-red-200 bg-red-50 rounded-lg p-6">
+          <h2 className="text-xl font-semibold mb-4 text-red-900">🔄 Reset All Ratings</h2>
+          <p className="text-red-700 mb-4">
+            This will reset ALL users to 1000 Elo rating (Chess.com baseline).
+          </p>
+          
+          <Button
+            onClick={runResetRatings}
+            disabled={isRunningReset}
+            className="bg-red-600 hover:bg-red-700"
+          >
+            {isRunningReset ? 'Resetting...' : 'Reset All Ratings to 1000'}
+          </Button>
+          
+          {resetResult && (
+            <pre className="mt-4 p-4 bg-white rounded text-sm overflow-auto border border-red-200">
+              {resetResult}
+            </pre>
+          )}
+        </div>
 
-        <div className="space-y-6">
-          {/* Cleanup Old Matches */}
-          <div className="bg-white rounded-lg border border-border p-6">
-            <h2 className="text-xl font-semibold text-ink mb-3">Clean Up Old Matches</h2>
-            <p className="text-ink-soft mb-4">
-              Closes all active matches older than 1 hour, resets all player states to idle, 
-              and clears the queue. Use this to fix stuck matches and player states.
-            </p>
-            
-            <Button 
-              onClick={handleCleanup}
-              disabled={cleaning}
-              variant="outline"
-              className="border-red-300 text-red-600 hover:bg-red-50"
-            >
-              {cleaning ? "Cleaning up..." : "Run Cleanup"}
-            </Button>
-
-            {result && (
-              <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                <p className="font-semibold text-green-800 mb-2">✅ Cleanup Complete!</p>
-                <ul className="text-sm text-green-700 space-y-1">
-                  <li>• Matches closed: {result.matchesClosed}</li>
-                  <li>• Queue entries removed: {result.queueEntriesRemoved}</li>
-                  <li>• User states reset: {result.userStatesReset}</li>
-                </ul>
-              </div>
-            )}
-
-            {error && (
-              <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-                <p className="font-semibold text-red-800">❌ Error</p>
-                <p className="text-sm text-red-700">{error}</p>
-              </div>
-            )}
-          </div>
-
-          {/* Instructions */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-            <h3 className="font-semibold text-blue-900 mb-2">ℹ️ When to Use</h3>
-            <ul className="text-sm text-blue-800 space-y-2">
-              <li>• Players stuck in old matches and can&apos;t queue</li>
-              <li>• Multiple users in multiple games simultaneously</li>
-              <li>• Queue has stale entries from disconnected players</li>
-              <li>• Fresh start needed for testing</li>
-            </ul>
-          </div>
-
-          {/* Console Alternative */}
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
-            <h3 className="font-semibold text-gray-900 mb-2">💻 Console Alternative</h3>
-            <p className="text-sm text-gray-700 mb-2">
-              You can also run cleanup from the browser console:
-            </p>
-            <code className="block bg-gray-900 text-green-400 p-3 rounded text-sm font-mono">
-              await window.runCleanup()
-            </code>
-          </div>
+        <div className="border rounded-lg p-6">
+          <h2 className="text-xl font-semibold mb-4">🧹 Cleanup Old Matches</h2>
+          <p className="text-ink-soft mb-4">
+            This will close all active matches older than 1 hour and reset all player states.
+          </p>
+          
+          <Button
+            onClick={runCleanup}
+            disabled={isRunningCleanup}
+          >
+            {isRunningCleanup ? 'Running...' : 'Run Cleanup'}
+          </Button>
+          
+          {cleanupResult && (
+            <pre className="mt-4 p-4 bg-ink-light rounded text-sm overflow-auto">
+              {cleanupResult}
+            </pre>
+          )}
         </div>
       </div>
     </div>
   );
 }
-
