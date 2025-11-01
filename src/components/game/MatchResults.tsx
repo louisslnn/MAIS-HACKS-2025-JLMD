@@ -33,8 +33,11 @@ export function MatchResults({ match, userId, onPlayAgain }: MatchResultsProps) 
         
         // Check if rating changes are already stored in the match document
         const matchData = match as any;
+        console.log('[MatchResults] Initial match data:', { matchId: match.id, hasRatingChanges: !!matchData.ratingChanges, userId });
+        
         if (matchData.ratingChanges && matchData.ratingChanges[userId]) {
           const change = matchData.ratingChanges[userId];
+          console.log('[MatchResults] Found rating change immediately:', change);
           setRatingChange({
             oldRating: change.oldRating,
             newRating: change.newRating,
@@ -50,14 +53,17 @@ export function MatchResults({ match, userId, onPlayAgain }: MatchResultsProps) 
         let delay = 300; // Start with 300ms
         
         while (attempts < maxAttempts) {
+          console.log(`[MatchResults] Polling attempt ${attempts + 1}/${maxAttempts}...`);
           const matchSnap = await getDoc(matchRef);
           
           if (matchSnap.exists()) {
             const matchData = matchSnap.data() as any;
+            console.log('[MatchResults] Polled match data:', { hasRatingChanges: !!matchData.ratingChanges, ratingProcessed: matchData.ratingProcessed });
             
             // Check if rating changes are now available
             if (matchData.ratingChanges && matchData.ratingChanges[userId]) {
               const change = matchData.ratingChanges[userId];
+              console.log('[MatchResults] Found rating change after polling:', change);
               setRatingChange({
                 oldRating: change.oldRating,
                 newRating: change.newRating,
@@ -75,6 +81,7 @@ export function MatchResults({ match, userId, onPlayAgain }: MatchResultsProps) 
         }
         
         // Fallback: use player's ratingAtStart if rating changes not available
+        console.warn('[MatchResults] Rating changes not found after max attempts. Using fallback.');
         const player = match.players[userId];
         const oldRating = player?.ratingAtStart || 1000;
         setRatingChange({

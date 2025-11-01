@@ -25,7 +25,7 @@ export default function AdminPage() {
   }
 
   async function runResetRatings() {
-    if (!confirm('This will reset ALL users to 1000 Elo. Are you sure?')) {
+    if (!confirm('⚠️ This will reset ALL users to 1000 Elo rating.\n\nAre you absolutely sure?')) {
       return;
     }
     
@@ -33,10 +33,16 @@ export default function AdminPage() {
     setResetResult(null);
     
     try {
+      console.log('Starting rating reset...');
       const response = await resetAllRatings();
+      console.log('Reset complete:', response.data);
       setResetResult(JSON.stringify(response.data, null, 2));
+      alert(`✅ Success! Reset ${response.data.count} users to 1000 Elo`);
     } catch (error) {
-      setResetResult(`Error: ${error instanceof Error ? error.message : String(error)}`);
+      console.error('Reset failed:', error);
+      const errorMsg = `Error: ${error instanceof Error ? error.message : String(error)}`;
+      setResetResult(errorMsg);
+      alert(`❌ ${errorMsg}`);
     } finally {
       setIsRunningReset(false);
     }
