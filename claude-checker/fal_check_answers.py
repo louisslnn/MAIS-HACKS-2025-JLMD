@@ -75,7 +75,7 @@ Rules:
 - Do NOT add any fields not specified above
 - Do NOT wrap response in ```json``` or any markdown
 - Do NOT add newlines, whitespace, or formatting - output compact JSON on a single line
-- Minimize token usage by keeping notes brief (2-4 words maximum)
+- Minimize token usage by keeping notes brief (state problem and error)
 - RESPOND AS FAST AS POSSIBLE - speed is more important than perfection
 
 Start your response with {{"results":[ and end with ]}}"""
