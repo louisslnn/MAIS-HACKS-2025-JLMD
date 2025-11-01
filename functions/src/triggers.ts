@@ -345,16 +345,18 @@ export const onMatchCompleted = onDocumentUpdated(
         },
       });
 
-      const leaderboardRef = db
-        .collection(collections.leaderboards)
-        .doc("current");
-      tx.set(
-        leaderboardRef,
-        {
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true },
-      );
+      // NOTE: Leaderboard update commented out - was causing transaction failures
+      // TODO: Implement proper leaderboard structure later
+      // const leaderboardRef = db
+      //   .collection(collections.leaderboards)
+      //   .doc("current");
+      // tx.set(
+      //   leaderboardRef,
+      //   {
+      //     updatedAt: serverTimestamp(),
+      //   },
+      //   { merge: true },
+      // );
     });
 
     logger.info("Processed match completion", { matchId });
