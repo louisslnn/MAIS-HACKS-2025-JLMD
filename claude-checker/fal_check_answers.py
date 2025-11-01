@@ -57,18 +57,24 @@ For each problem in the expected list, analyze the image to determine:
 1. If the problem appears in the image
 2. If an answer is given in the image
 3. If that answer matches the expected answer
+4. Your confidence level in the verification (0.0 to 1.0)
 
 CRITICAL: You MUST respond with ONLY a valid JSON object. No markdown, no code blocks, no explanatory text before or after. Your entire response must be parseable JSON.
 
 SPEED IS PARAMOUNT: Respond as quickly as possible with minimal tokens. Skip any verbose analysis.
 
 Required JSON structure (follow this EXACTLY):
-{{"results":[{{"id":1,"is_correct":true,"found_in_image":true,"notes":""}},{{"id":2,"is_correct":false,"found_in_image":true,"notes":"addition error"}}]}}
+{{"results":[{{"id":1,"is_correct":true,"confidence":1.0,"notes":""}},{{"id":2,"is_correct":false,"confidence":0.95,"notes":"addition error"}}]}}
 
 Rules:
 - "id" must be an integer matching the problem ID
 - "is_correct" must be boolean (true/false, lowercase, no quotes)
-- "found_in_image" must be boolean (true/false, lowercase, no quotes)
+- "confidence" must be a float between 0.0 and 1.0 (how certain you are about this verification)
+  - 1.0 = completely certain (problem clearly visible, answer obviously correct/incorrect)
+  - 0.9 = very confident (minor ambiguity in handwriting but answer is clear)
+  - 0.7-0.8 = moderately confident (some difficulty reading but likely correct assessment)
+  - 0.5-0.6 = low confidence (handwriting unclear or problem partially visible)
+  - 0.0-0.4 = very uncertain (problem not found or completely illegible)
 - "notes" must be a string (use "" for empty string if answer is correct)
 - Include ONLY error notes when is_correct is false
 - Include ALL problems from the expected list in order
@@ -188,10 +194,10 @@ def main():
         if 'verification_results' in results:
             verification = results['verification_results'].get('results', [])
             correct_count = sum(1 for r in verification if r.get('is_correct'))
-            found_count = sum(1 for r in verification if r.get('found_in_image'))
+            avg_confidence = sum(r.get('confidence', 0) for r in verification) / len(verification) if verification else 0
             print(f'✓ Analyzed {len(verification)} problems')
-            print(f'✓ Found in image: {found_count}/{len(verification)}')
             print(f'✓ Correct answers: {correct_count}/{len(verification)}')
+            print(f'✓ Average confidence: {avg_confidence:.2f}')
         
         return 0
 

@@ -1,9 +1,9 @@
 {
   "model": "anthropic/claude-sonnet-4.5 (via fal-ai/any-llm/vision)",
   "image_analyzed": "C:\\Users\\julie\\Documents\\Github\\MAIS-HACKS-2025-JLMD\\claude-checker\\testsheet.jpg",
-  "claude_response": "{\"results\":[{\"id\":1,\"is_correct\":true,\"found_in_image\":true,\"notes\":\"\"},{\"id\":2,\"is_correct\":true,\"found_in_image\":true,\"notes\":\"\"},{\"id\":3,\"is_correct\":true,\"found_in_image\":true,\"notes\":\"\"},{\"id\":4,\"is_correct\":true,\"found_in_image\":true,\"notes\":\"\"},{\"id\":5,\"is_correct\":true,\"found_in_image\":true,\"notes\":\"\"},{\"id\":6,\"is_correct\":false,\"found_in_image\":true,\"notes\":\"wrote 12 not 16\"},{\"id\":7,\"is_correct\":false,\"found_in_image\":true,\"notes\":\"wrote 17 not 16\"},{\"id\":8,\"is_correct\":true,\"found_in_image\":true,\"notes\":\"\"},{\"id\":9,\"is_correct\":true,\"found_in_image\":true,\"notes\":\"\"},{\"id\":10,\"is_correct\":true,\"found_in_image\":true,\"notes\":\"\"}]}",
+  "claude_response": "{\"results\":[{\"id\":1,\"is_correct\":true,\"confidence\":1.0,\"notes\":\"\"},{\"id\":2,\"is_correct\":true,\"confidence\":1.0,\"notes\":\"\"},{\"id\":3,\"is_correct\":true,\"confidence\":1.0,\"notes\":\"\"},{\"id\":4,\"is_correct\":true,\"confidence\":1.0,\"notes\":\"\"},{\"id\":5,\"is_correct\":true,\"confidence\":1.0,\"notes\":\"\"},{\"id\":6,\"is_correct\":false,\"confidence\":0.95,\"notes\":\"7+9=12 written, should be 16\"},{\"id\":7,\"is_correct\":false,\"confidence\":0.95,\"notes\":\"6+10=12 written, should be 16\"},{\"id\":8,\"is_correct\":true,\"confidence\":1.0,\"notes\":\"\"},{\"id\":9,\"is_correct\":true,\"confidence\":1.0,\"notes\":\"\"},{\"id\":10,\"is_correct\":true,\"confidence\":1.0,\"notes\":\"\"}]}",
   "raw_result": {
-    "output": "{\"results\":[{\"id\":1,\"is_correct\":true,\"found_in_image\":true,\"notes\":\"\"},{\"id\":2,\"is_correct\":true,\"found_in_image\":true,\"notes\":\"\"},{\"id\":3,\"is_correct\":true,\"found_in_image\":true,\"notes\":\"\"},{\"id\":4,\"is_correct\":true,\"found_in_image\":true,\"notes\":\"\"},{\"id\":5,\"is_correct\":true,\"found_in_image\":true,\"notes\":\"\"},{\"id\":6,\"is_correct\":false,\"found_in_image\":true,\"notes\":\"wrote 12 not 16\"},{\"id\":7,\"is_correct\":false,\"found_in_image\":true,\"notes\":\"wrote 17 not 16\"},{\"id\":8,\"is_correct\":true,\"found_in_image\":true,\"notes\":\"\"},{\"id\":9,\"is_correct\":true,\"found_in_image\":true,\"notes\":\"\"},{\"id\":10,\"is_correct\":true,\"found_in_image\":true,\"notes\":\"\"}]}",
+    "output": "{\"results\":[{\"id\":1,\"is_correct\":true,\"confidence\":1.0,\"notes\":\"\"},{\"id\":2,\"is_correct\":true,\"confidence\":1.0,\"notes\":\"\"},{\"id\":3,\"is_correct\":true,\"confidence\":1.0,\"notes\":\"\"},{\"id\":4,\"is_correct\":true,\"confidence\":1.0,\"notes\":\"\"},{\"id\":5,\"is_correct\":true,\"confidence\":1.0,\"notes\":\"\"},{\"id\":6,\"is_correct\":false,\"confidence\":0.95,\"notes\":\"7+9=12 written, should be 16\"},{\"id\":7,\"is_correct\":false,\"confidence\":0.95,\"notes\":\"6+10=12 written, should be 16\"},{\"id\":8,\"is_correct\":true,\"confidence\":1.0,\"notes\":\"\"},{\"id\":9,\"is_correct\":true,\"confidence\":1.0,\"notes\":\"\"},{\"id\":10,\"is_correct\":true,\"confidence\":1.0,\"notes\":\"\"}]}",
     "reasoning": null,
     "partial": false,
     "error": null
@@ -13,61 +13,61 @@
       {
         "id": 1,
         "is_correct": true,
-        "found_in_image": true,
+        "confidence": 1.0,
         "notes": ""
       },
       {
         "id": 2,
         "is_correct": true,
-        "found_in_image": true,
+        "confidence": 1.0,
         "notes": ""
       },
       {
         "id": 3,
         "is_correct": true,
-        "found_in_image": true,
+        "confidence": 1.0,
         "notes": ""
       },
       {
         "id": 4,
         "is_correct": true,
-        "found_in_image": true,
+        "confidence": 1.0,
         "notes": ""
       },
       {
         "id": 5,
         "is_correct": true,
-        "found_in_image": true,
+        "confidence": 1.0,
         "notes": ""
       },
       {
         "id": 6,
         "is_correct": false,
-        "found_in_image": true,
-        "notes": "wrote 12 not 16"
+        "confidence": 0.95,
+        "notes": "7+9=12 written, should be 16"
       },
       {
         "id": 7,
         "is_correct": false,
-        "found_in_image": true,
-        "notes": "wrote 17 not 16"
+        "confidence": 0.95,
+        "notes": "6+10=12 written, should be 16"
       },
       {
         "id": 8,
         "is_correct": true,
-        "found_in_image": true,
+        "confidence": 1.0,
         "notes": ""
       },
       {
         "id": 9,
         "is_correct": true,
-        "found_in_image": true,
+        "confidence": 1.0,
         "notes": ""
       },
       {
         "id": 10,
         "is_correct": true,
-        "found_in_image": true,
+        "confidence": 1.0,
         "notes": ""
       }
     ]
