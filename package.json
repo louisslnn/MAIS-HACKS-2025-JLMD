@@ -6,21 +6,33 @@
     "dev": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "functions:install": "cd functions && npm install",
+    "functions:build": "cd functions && npm run build",
+    "functions:lint": "cd functions && npm run lint",
+    "functions:deploy": "cd functions && npm run deploy",
+    "test:simulate": "node scripts/simulate-match.js",
+    "test:lobby": "node scripts/simulate-lobby.js",
+    "test:e2e": "node scripts/test-end-to-end.js",
+    "deploy": "npm run build && firebase deploy"
   },
   "dependencies": {
+    "@radix-ui/react-slot": "^1.1.1",
+    "firebase": "^12.5.0",
+    "next": "16.0.1",
     "react": "19.2.0",
-    "react-dom": "19.2.0",
-    "next": "16.0.1"
+    "react-dom": "19.2.0"
   },
   "devDependencies": {
-    "typescript": "^5",
+    "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@tailwindcss/postcss": "^4",
-    "tailwindcss": "^4",
+    "dotenv": "^17.2.3",
     "eslint": "^9",
-    "eslint-config-next": "16.0.1"
+    "eslint-config-next": "16.0.1",
+    "firebase-admin": "^13.5.0",
+    "tailwindcss": "^4",
+    "typescript": "^5"
   }
 }

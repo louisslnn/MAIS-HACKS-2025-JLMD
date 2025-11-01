@@ -1,0 +1,35 @@
+{
+  "name": "mathclash-functions",
+  "description": "Firebase Cloud Functions for MathClash matchmaking, scoring, and Elo updates.",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "main": "lib/index.js",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rimraf lib",
+    "lint": "eslint \"src/**/*.ts\"",
+    "serve": "npm run build && firebase emulators:start --only functions,firestore,database",
+    "deploy": "npm run build && firebase deploy --only functions",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": "20"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^5.1.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.18.0",
+    "@typescript-eslint/parser": "^8.18.0",
+    "eslint": "^9.25.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.31.0",
+    "firebase-functions-test": "^3.2.0",
+    "prettier": "^3.4.1",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.7.2"
+  }
+}

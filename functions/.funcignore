@@ -1,0 +1,7 @@
+node_modules
+lib
+src/**/*.test.ts
+tsconfig.json
+.eslintrc.cjs
+.prettierrc*
+README.md

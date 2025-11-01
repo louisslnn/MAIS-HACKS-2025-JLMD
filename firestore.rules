@@ -1,0 +1,62 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function matchDoc(matchId) {
+      return get(/databases/$(database)/documents/matches/$(matchId));
+    }
+
+    function isParticipant(matchId) {
+      return signedIn() && request.auth.uid in matchDoc(matchId).data.playerIds;
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if signedIn() && request.auth.uid == uid;
+      // Allow Cloud Functions to update player state
+      allow update: if signedIn();
+    }
+
+    match /matches/{matchId} {
+      // Allow read if user is authenticated and is a participant
+      // For queries, we can check resource.data.playerIds directly
+      // For direct document reads, we can also use resource.data
+      allow read: if signedIn() && request.auth.uid in resource.data.playerIds;
+      allow create, update, delete: if false;
+
+      match /rounds/{roundId} {
+        allow read: if isParticipant(matchId);
+        allow create, update, delete: if false;
+
+        match /answers/{uid} {
+          allow read: if isParticipant(matchId);
+          allow create: if signedIn() && request.auth.uid == uid
+            && !('correct' in request.resource.data)
+            && !('judgedAt' in request.resource.data);
+          allow update, delete: if false;
+        }
+      }
+    }
+
+    // Queue structure: queues/quickMatch/tickets/{ticketId}
+    match /queues/quickMatch/tickets/{ticketId} {
+      // Allow authenticated users to read queue (for lobby display)
+      allow read: if signedIn();
+      // Only Cloud Functions can write to queue
+      allow write: if false;
+    }
+
+    match /leaderboards/{doc=**} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /ratings/{uid}/history/{eventId} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if false;
+    }
+  }
+}

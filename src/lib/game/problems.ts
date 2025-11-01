@@ -1,0 +1,107 @@
+/**
+ * Math Problems Database
+ * Contains addition problems and integral problems
+ */
+
+export interface Problem {
+  id: number;
+  problem: string;
+  answer: string | number;
+}
+
+export interface ProblemsDatabase {
+  addition: Problem[];
+  integrals: Problem[];
+}
+
+export const problemsDatabase: ProblemsDatabase = {
+  addition: [
+    { id: 1, problem: "$1 + 10$", answer: 11 },
+    { id: 2, problem: "$12 + 4$", answer: 16 },
+    { id: 3, problem: "$1 + 8$", answer: 9 },
+    { id: 4, problem: "$8 + 3$", answer: 11 },
+    { id: 5, problem: "$16 + 10$", answer: 26 },
+    { id: 6, problem: "$15 + 9$", answer: 24 },
+    { id: 7, problem: "$8 + 10$", answer: 18 },
+    { id: 8, problem: "$13 + 9$", answer: 22 },
+    { id: 9, problem: "$20 + 15$", answer: 35 },
+    { id: 10, problem: "$20 + 10$", answer: 30 },
+  ],
+  integrals: [
+    {
+      id: 1,
+      problem: "\\int{{4{x^6} - 2{x^3} + 7x - 4\\,dx}}",
+      answer: "{{\\frac{4}{7}{x^7} - \\frac{1}{2}{x^4} + \\frac{7}{2}{x^2} - 4x + c}}",
+    },
+    {
+      id: 2,
+      problem: "\\int{{{z^7} - 48{z^{11}} - 5{z^{16}}\\,dz}}",
+      answer: "{{\\frac{1}{8}{z^8} - 4{z^{12}} - \\frac{5}{{17}}{z^{17}} + c}}",
+    },
+    {
+      id: 3,
+      problem: "\\int{{10{t^{ - 3}} + 12{t^{ - 9}} + 4{t^3}\\,dt}}",
+      answer: "{{ - 5{t^{ - 2}} - \\frac{3}{2}{t^{ - 8}} + {t^4} + c}}",
+    },
+    {
+      id: 4,
+      problem: "\\int{{{w^{ - 2}} + 10{w^{ - 5}} - 8\\,dw}}",
+      answer: "{{ - {w^{ - 1}} - \\frac{5}{2}{w^{ - 4}} - 8w + c}}",
+    },
+    {
+      id: 5,
+      problem: "\\int{{12\\,dy}}",
+      answer: "{{12y + c}}",
+    },
+    {
+      id: 6,
+      problem: "\\int{{\\sqrt[3]{w} + 10\\,\\,\\sqrt[5]{{{w^3}}}\\,dw}}",
+      answer: "{{\\frac{3}{4}{w^{\\,\\frac{4}{3}}} + \\frac{{25}}{4}{w^{\\,\\frac{8}{5}}} + c}}",
+    },
+    {
+      id: 7,
+      problem: "\\int{{\\sqrt {{x^7}} - 7\\,\\sqrt[6]{{{x^5}}} + 17\\,\\,\\sqrt[3]{{{x^{10}}}}\\,dx}}",
+      answer: "{{\\frac{2}{9}{x^{\\frac{9}{2}}} - \\frac{{42}}{{11}}{x^{\\frac{{11}}{6}}} + \\frac{{51}}{{13}}{x^{\\frac{{13}}{3}}} + c}}",
+    },
+    {
+      id: 8,
+      problem: "\\int{{\\frac{4}{{{x^2}}} + 2 - \\frac{1}{{8{x^3}}}\\,dx}}",
+      answer: "{{ - 4{x^{ - 1}} + 2x + \\frac{1}{{16}}{x^{ - 2}} + c}}",
+    },
+    {
+      id: 9,
+      problem: "\\int{{\\frac{7}{{3{y^6}}} + \\frac{1}{{{y^{10}}}} - \\frac{2}{{\\sqrt[3]{{{y^4}}}}}\\,dy}}",
+      answer: "{{ - \\frac{7}{{15}}{y^{ - 5}} - \\frac{1}{9}{y^{ - 9}} + 6{y^{ - \\,\\,\\frac{1}{3}}} + c}}",
+    },
+    {
+      id: 10,
+      problem: "\\int{{\\sin \\left( x \\right) + 10{{\\csc }^2}\\left( x \\right)\\,dx}}",
+      answer: "{{ - \\cos \\left( x \\right) - 10\\cot \\left( x \\right) + c}}",
+    },
+  ],
+};
+
+/**
+ * Get a random problem from a category
+ */
+export function getRandomProblem(category: 'addition' | 'integrals'): Problem {
+  const problems = problemsDatabase[category];
+  const randomIndex = Math.floor(Math.random() * problems.length);
+  return problems[randomIndex];
+}
+
+/**
+ * Get a problem by ID from a category
+ */
+export function getProblemById(category: 'addition' | 'integrals', id: number): Problem | null {
+  const problems = problemsDatabase[category];
+  return problems.find(p => p.id === id) || null;
+}
+
+/**
+ * Get all problems from a category
+ */
+export function getAllProblems(category: 'addition' | 'integrals'): Problem[] {
+  return problemsDatabase[category];
+}
+

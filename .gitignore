@@ -31,7 +31,16 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files (can opt-in for committing if needed)
-.env*
+.env
+.env.local
+.env.*.local
+
+# Keep .env.example as it's safe to commit
+!.env.example
+!.env.local.example
+
+# test files with credentials
+test-firestore-admin.js
 
 # vercel
 .vercel

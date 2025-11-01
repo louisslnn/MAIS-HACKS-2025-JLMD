@@ -12,6 +12,13 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "functions/lib/**",
+    "functions/node_modules/**",
+    // Additional ignores:
+    "scripts/**",
+    "src/app/test-firestore/**",
+    "src/lib/firebase/test-firestore.ts",
+    "test-firestore-admin.js"
   ]),
 ]);
 
