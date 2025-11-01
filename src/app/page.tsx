@@ -69,28 +69,18 @@ export default function Home() {
             </div>
           ) : user ? (
             <div className="flex flex-col sm:flex-row items-center gap-4">
-              <a 
+              <Link 
                 href="/play"
                 className="inline-flex items-center justify-center gap-2 h-12 rounded-full px-8 py-6 text-lg font-medium bg-brand text-white shadow-sm hover:bg-brand/90 transition-colors cursor-pointer"
-                onClick={(e) => {
-                  e.preventDefault();
-                  console.log('[Home] Enter Arena clicked, navigating to /play');
-                  router.push('/play');
-                }}
               >
                 Enter Arena
                 <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
               </a>
-              <a 
+              <Link 
                 href="/social"
                 className="inline-flex items-center justify-center gap-2 h-12 rounded-full px-8 py-6 text-lg font-medium border border-border text-ink hover:bg-surface-muted transition-colors cursor-pointer"
-                onClick={(e) => {
-                  e.preventDefault();
-                  console.log('[Home] Leaderboard clicked, navigating to /social');
-                  router.push('/social');
-                }}
               >
                 View Leaderboard
               </a>
