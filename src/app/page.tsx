@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -9,6 +10,23 @@ import { Button } from "@/components/ui";
 export default function Home() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+
+  // Fix hydration mismatch - only render after mount
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return (
+      <div className="relative min-h-[calc(100vh-200px)] flex items-center justify-center">
+        <div className="flex items-center gap-3 text-ink-soft">
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-brand border-t-transparent"></div>
+          <span>Loading...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-[calc(100vh-200px)] flex items-center justify-center overflow-hidden">
