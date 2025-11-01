@@ -15,7 +15,12 @@ export default function Home() {
   // Fix hydration mismatch - only render after mount
   useEffect(() => {
     setMounted(true);
+    console.log('[Home] Mounted. User:', user, 'Loading:', loading);
   }, []);
+
+  useEffect(() => {
+    console.log('[Home] Auth state changed. User:', user, 'Loading:', loading);
+  }, [user, loading]);
 
   if (!mounted) {
     return (
@@ -64,24 +69,31 @@ export default function Home() {
             </div>
           ) : user ? (
             <div className="flex flex-col sm:flex-row items-center gap-4">
-              <Button 
-                size="lg" 
-                className="w-full sm:w-auto text-lg px-8 py-6"
-                onClick={() => router.push('/play')}
+              <a 
+                href="/play"
+                className="inline-flex items-center justify-center gap-2 h-12 rounded-full px-8 py-6 text-lg font-medium bg-brand text-white shadow-sm hover:bg-brand/90 transition-colors cursor-pointer"
+                onClick={(e) => {
+                  e.preventDefault();
+                  console.log('[Home] Enter Arena clicked, navigating to /play');
+                  router.push('/play');
+                }}
               >
                 Enter Arena
                 <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
-              </Button>
-              <Button 
-                size="lg" 
-                variant="outline" 
-                className="w-full sm:w-auto text-lg px-8 py-6"
-                onClick={() => router.push('/social')}
+              </a>
+              <a 
+                href="/social"
+                className="inline-flex items-center justify-center gap-2 h-12 rounded-full px-8 py-6 text-lg font-medium border border-border text-ink hover:bg-surface-muted transition-colors cursor-pointer"
+                onClick={(e) => {
+                  e.preventDefault();
+                  console.log('[Home] Leaderboard clicked, navigating to /social');
+                  router.push('/social');
+                }}
               >
                 View Leaderboard
-              </Button>
+              </a>
             </div>
           ) : (
             <>
