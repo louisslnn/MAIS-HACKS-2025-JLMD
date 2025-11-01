@@ -30,10 +30,11 @@ except ImportError:
 
 REPO_DIR = os.path.dirname(__file__)
 OUTPUT_PATH = os.path.join(REPO_DIR, 'integrals.json')
+LOG_PATH = os.path.join(REPO_DIR, 'log.json')
 
 # HYPERPARAMETERS - Edit these to configure generation
-NUM_PROBLEMS = 30
-DIFFICULTY = 'u-sub, trig intergrals, integration by parts'
+NUM_PROBLEMS = 40
+DIFFICULTY = 'mixed integrals first year calculus'
 MODEL = 'anthropic/claude-sonnet-4.5'
 APPEND_MODE = True  # Set to True to append to existing file instead of overwriting
 
@@ -229,23 +230,66 @@ def main():
             return 0
             
         except json.JSONDecodeError as e:
+            # Don't overwrite existing integrals, log error instead
+            import datetime
             err = {
+                'timestamp': datetime.datetime.now().isoformat(),
+                'error_type': 'JSONDecodeError',
                 'error': f'Failed to parse JSON from LLM output: {e}',
-                'llm_output': llm_output
+                'llm_output': llm_output,
+                'hyperparameters': {
+                    'num_problems': NUM_PROBLEMS,
+                    'difficulty': DIFFICULTY,
+                    'model': MODEL,
+                    'start_id': start_id
+                }
             }
-            with open(OUTPUT_PATH, 'w', encoding='utf-8') as f:
+            with open(LOG_PATH, 'w', encoding='utf-8') as f:
                 json.dump(err, f, indent=2)
             print(f'ERROR: Could not parse JSON: {e}')
+            print(f'Error details written to {LOG_PATH}')
+            return 1
+        
+        except ValueError as e:
+            # Don't overwrite existing integrals, log error instead
+            import datetime
+            err = {
+                'timestamp': datetime.datetime.now().isoformat(),
+                'error_type': 'ValueError',
+                'error': str(e),
+                'llm_output': llm_output,
+                'hyperparameters': {
+                    'num_problems': NUM_PROBLEMS,
+                    'difficulty': DIFFICULTY,
+                    'model': MODEL,
+                    'start_id': start_id
+                }
+            }
+            with open(LOG_PATH, 'w', encoding='utf-8') as f:
+                json.dump(err, f, indent=2)
+            print(f'ERROR: {e}')
+            print(f'Error details written to {LOG_PATH}')
+            print('Existing integrals.json was NOT modified')
             return 1
             
     except Exception as e:
+        # Don't overwrite existing integrals, log error instead
+        import datetime
         err = {
+            'timestamp': datetime.datetime.now().isoformat(),
+            'error_type': type(e).__name__,
             'error': f'Generation failed: {str(e)}',
-            'type': type(e).__name__
+            'hyperparameters': {
+                'num_problems': NUM_PROBLEMS,
+                'difficulty': DIFFICULTY,
+                'model': MODEL
+            }
         }
-        with open(OUTPUT_PATH, 'w', encoding='utf-8') as f:
+        with open(LOG_PATH, 'w', encoding='utf-8') as f:
             json.dump(err, f, indent=2)
         print(f'ERROR: {e}')
+        print(f'Error details written to {LOG_PATH}')
+        print('Existing integrals.json was NOT modified')
         import traceback
         traceback.print_exc()
         return 1

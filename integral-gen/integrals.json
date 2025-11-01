@@ -12,193 +12,593 @@
         },
         {
             "id": 3,
-            "problem": "$\\int (3x^2 + 2x) \\, dx$",
-            "answer": "$x^3 + x^2 + C$"
+            "problem": "$\\int \\frac{1}{x} \\, dx$",
+            "answer": "$\\ln|x| + C$"
         },
         {
             "id": 4,
-            "problem": "$\\int 6x^5 \\, dx$",
-            "answer": "$x^6 + C$"
+            "problem": "$\\int e^x \\, dx$",
+            "answer": "$e^x + C$"
         },
         {
             "id": 5,
-            "problem": "$\\int (4x^3 - 6x^2 + 2x) \\, dx$",
-            "answer": "$x^4 - 2x^3 + x^2 + C$"
+            "problem": "$\\int \\cos(x) \\, dx$",
+            "answer": "$\\sin(x) + C$"
         },
         {
             "id": 6,
-            "problem": "$\\int (x^2 + 4x + 3) \\, dx$",
-            "answer": "$\\frac{x^3}{3} + 2x^2 + 3x + C$"
+            "problem": "$\\int \\sin(x) \\, dx$",
+            "answer": "$-\\cos(x) + C$"
         },
         {
             "id": 7,
-            "problem": "$\\int 8x \\, dx$",
-            "answer": "$4x^2 + C$"
+            "problem": "$\\int \\sec^2(x) \\, dx$",
+            "answer": "$\\tan(x) + C$"
         },
         {
             "id": 8,
-            "problem": "$\\int (2x^4 + 3x^2 - 5) \\, dx$",
-            "answer": "$\\frac{2x^5}{5} + x^3 - 5x + C$"
+            "problem": "$\\int (3x^2 + 2x - 1) \\, dx$",
+            "answer": "$x^3 + x^2 - x + C$"
         },
         {
             "id": 9,
-            "problem": "$\\int (x^3 - x) \\, dx$",
-            "answer": "$\\frac{x^4}{4} - \\frac{x^2}{2} + C$"
+            "problem": "$\\int \\frac{1}{x^2} \\, dx$",
+            "answer": "$-\\frac{1}{x} + C$"
         },
         {
             "id": 10,
-            "problem": "$\\int (10x^9 + 7x^6) \\, dx$",
-            "answer": "$x^{10} + x^7 + C$"
+            "problem": "$\\int \\sqrt{x} \\, dx$",
+            "answer": "$\\frac{2x^{3/2}}{3} + C$"
         },
         {
             "id": 11,
-            "problem": "$\\int 2x e^{x^2} \\, dx$",
-            "answer": "$e^{x^2} + C$"
+            "problem": "$\\int 2e^{2x} \\, dx$",
+            "answer": "$e^{2x} + C$"
         },
         {
             "id": 12,
-            "problem": "$\\int \\frac{3x^2}{x^3 + 1} \\, dx$",
-            "answer": "$\\ln|x^3 + 1| + C$"
+            "problem": "$\\int \\frac{1}{1+x^2} \\, dx$",
+            "answer": "$\\arctan(x) + C$"
         },
         {
             "id": 13,
-            "problem": "$\\int \\sin(x) \\cos(x) \\, dx$",
-            "answer": "$\\frac{\\sin^2(x)}{2} + C$"
+            "problem": "$\\int \\frac{1}{\\sqrt{1-x^2}} \\, dx$",
+            "answer": "$\\arcsin(x) + C$"
         },
         {
             "id": 14,
-            "problem": "$\\int x \\cos(x^2) \\, dx$",
-            "answer": "$\\frac{\\sin(x^2)}{2} + C$"
+            "problem": "$\\int \\sec(x)\\tan(x) \\, dx$",
+            "answer": "$\\sec(x) + C$"
         },
         {
             "id": 15,
-            "problem": "$\\int \\frac{\\ln(x)}{x} \\, dx$",
-            "answer": "$\\frac{\\ln^2(x)}{2} + C$"
+            "problem": "$\\int (x+1)^2 \\, dx$",
+            "answer": "$\\frac{(x+1)^3}{3} + C$"
         },
         {
             "id": 16,
-            "problem": "$\\int \\sin^3(x) \\cos(x) \\, dx$",
-            "answer": "$\\frac{\\sin^4(x)}{4} + C$"
+            "problem": "$\\int 3\\sin(2x) \\, dx$",
+            "answer": "$-\\frac{3\\cos(2x)}{2} + C$"
         },
         {
             "id": 17,
-            "problem": "$\\int x e^x \\, dx$",
-            "answer": "$x e^x - e^x + C$"
+            "problem": "$\\int x e^{x^2} \\, dx$",
+            "answer": "$\\frac{e^{x^2}}{2} + C$"
         },
         {
             "id": 18,
-            "problem": "$\\int \\sec^2(3x) \\, dx$",
-            "answer": "$\\frac{\\tan(3x)}{3} + C$"
+            "problem": "$\\int \\frac{2x}{x^2+1} \\, dx$",
+            "answer": "$\\ln(x^2+1) + C$"
         },
         {
             "id": 19,
-            "problem": "$\\int x \\ln(x) \\, dx$",
-            "answer": "$\\frac{x^2 \\ln(x)}{2} - \\frac{x^2}{4} + C$"
+            "problem": "$\\int \\csc^2(x) \\, dx$",
+            "answer": "$-\\cot(x) + C$"
         },
         {
             "id": 20,
-            "problem": "$\\int e^{2x} \\sin(x) \\, dx$",
-            "answer": "$\\frac{e^{2x}(2\\sin(x) - \\cos(x))}{5} + C$"
+            "problem": "$\\int 4x^3 - 6x + 2 \\, dx$",
+            "answer": "$x^4 - 3x^2 + 2x + C$"
         },
         {
             "id": 21,
-            "problem": "$\\int \\frac{e^{\\sqrt{x}}}{\\sqrt{x}} \\, dx$",
-            "answer": "$2e^{\\sqrt{x}} + C$"
+            "problem": "$\\int \\frac{3}{x} \\, dx$",
+            "answer": "$3\\ln|x| + C$"
         },
         {
             "id": 22,
-            "problem": "$\\int \\sin^2(x) \\, dx$",
-            "answer": "$\\frac{x}{2} - \\frac{\\sin(2x)}{4} + C$"
+            "problem": "$\\int e^{-x} \\, dx$",
+            "answer": "$-e^{-x} + C$"
         },
         {
             "id": 23,
-            "problem": "$\\int x^2 e^x \\, dx$",
-            "answer": "$x^2 e^x - 2x e^x + 2e^x + C$"
+            "problem": "$\\int \\cos(3x) \\, dx$",
+            "answer": "$\\frac{\\sin(3x)}{3} + C$"
         },
         {
             "id": 24,
+            "problem": "$\\int x^{-1/2} \\, dx$",
+            "answer": "$2\\sqrt{x} + C$"
+        },
+        {
+            "id": 25,
+            "problem": "$\\int (2x+3)^3 \\, dx$",
+            "answer": "$\\frac{(2x+3)^4}{8} + C$"
+        },
+        {
+            "id": 26,
+            "problem": "$\\int \\frac{5}{1+x^2} \\, dx$",
+            "answer": "$5\\arctan(x) + C$"
+        },
+        {
+            "id": 27,
+            "problem": "$\\int x^2 e^{x^3} \\, dx$",
+            "answer": "$\\frac{e^{x^3}}{3} + C$"
+        },
+        {
+            "id": 28,
+            "problem": "$\\int \\sin^2(x)\\cos(x) \\, dx$",
+            "answer": "$\\frac{\\sin^3(x)}{3} + C$"
+        },
+        {
+            "id": 29,
+            "problem": "$\\int \\frac{1}{x\\ln(x)} \\, dx$",
+            "answer": "$\\ln|\\ln(x)| + C$"
+        },
+        {
+            "id": 30,
+            "problem": "$\\int 6x(x^2-1)^2 \\, dx$",
+            "answer": "$(x^2-1)^3 + C$"
+        },
+        {
+            "id": 31,
             "problem": "$\\int \\tan(x) \\, dx$",
             "answer": "$-\\ln|\\cos(x)| + C$"
         },
         {
-            "id": 25,
-            "problem": "$\\int \\frac{2x}{x^2 + 4} \\, dx$",
-            "answer": "$\\ln(x^2 + 4) + C$"
-        },
-        {
-            "id": 26,
-            "problem": "$\\int x \\sin(x) \\, dx$",
-            "answer": "$-x \\cos(x) + \\sin(x) + C$"
-        },
-        {
-            "id": 27,
-            "problem": "$\\int \\cos^2(x) \\, dx$",
-            "answer": "$\\frac{x}{2} + \\frac{\\sin(2x)}{4} + C$"
-        },
-        {
-            "id": 28,
-            "problem": "$\\int \\frac{\\sec^2(x)}{\\tan(x)} \\, dx$",
-            "answer": "$\\ln|\\tan(x)| + C$"
-        },
-        {
-            "id": 29,
-            "problem": "$\\int x^2 \\sin(x) \\, dx$",
-            "answer": "$-x^2 \\cos(x) + 2x \\sin(x) + 2\\cos(x) + C$"
-        },
-        {
-            "id": 30,
-            "problem": "$\\int e^x \\cos(x) \\, dx$",
-            "answer": "$\\frac{e^x(\\sin(x) + \\cos(x))}{2} + C$"
-        },
-        {
-            "id": 31,
-            "problem": "$\\int \\frac{x}{\\sqrt{x^2 + 1}} \\, dx$",
-            "answer": "$\\sqrt{x^2 + 1} + C$"
-        },
-        {
             "id": 32,
-            "problem": "$\\int \\sec(x) \\tan(x) \\, dx$",
-            "answer": "$\\sec(x) + C$"
+            "problem": "$\\int \\frac{e^x}{e^x+1} \\, dx$",
+            "answer": "$\\ln(e^x+1) + C$"
         },
         {
             "id": 33,
-            "problem": "$\\int x^3 \\cos(x^2) \\, dx$",
-            "answer": "$\\frac{x^2 \\sin(x^2)}{2} + \\frac{\\cos(x^2)}{2} + C$"
+            "problem": "$\\int 4\\cos(x)\\sin(x) \\, dx$",
+            "answer": "$2\\sin^2(x) + C$"
         },
         {
             "id": 34,
-            "problem": "$\\int \\ln(x) \\, dx$",
-            "answer": "$x \\ln(x) - x + C$"
+            "problem": "$\\int \\frac{x}{\\sqrt{x^2+1}} \\, dx$",
+            "answer": "$\\sqrt{x^2+1} + C$"
         },
         {
             "id": 35,
-            "problem": "$\\int \\frac{\\sin(\\ln(x))}{x} \\, dx$",
-            "answer": "$-\\cos(\\ln(x)) + C$"
+            "problem": "$\\int (1-x)^5 \\, dx$",
+            "answer": "$-\\frac{(1-x)^6}{6} + C$"
         },
         {
             "id": 36,
-            "problem": "$\\int x e^{-x} \\, dx$",
-            "answer": "$-x e^{-x} - e^{-x} + C$"
+            "problem": "$\\int x\\sqrt{x^2+4} \\, dx$",
+            "answer": "$\\frac{(x^2+4)^{3/2}}{3} + C$"
         },
         {
             "id": 37,
-            "problem": "$\\int \\sin(x) e^{\\cos(x)} \\, dx$",
-            "answer": "$-e^{\\cos(x)} + C$"
+            "problem": "$\\int e^{3x+1} \\, dx$",
+            "answer": "$\\frac{e^{3x+1}}{3} + C$"
         },
         {
             "id": 38,
-            "problem": "$\\int \\arctan(x) \\, dx$",
-            "answer": "$x \\arctan(x) - \\frac{\\ln(1 + x^2)}{2} + C$"
+            "problem": "$\\int \\frac{\\cos(x)}{\\sin(x)} \\, dx$",
+            "answer": "$\\ln|\\sin(x)| + C$"
         },
         {
             "id": 39,
-            "problem": "$\\int x \\sec^2(x) \\, dx$",
-            "answer": "$x \\tan(x) + \\ln|\\cos(x)| + C$"
+            "problem": "$\\int \\frac{x^2+1}{x} \\, dx$",
+            "answer": "$\\frac{x^2}{2} + \\ln|x| + C$"
         },
         {
             "id": 40,
-            "problem": "$\\int \\frac{x^3}{x^2 + 1} \\, dx$",
-            "answer": "$\\frac{x^2}{2} - \\frac{\\ln(x^2 + 1)}{2} + C$"
+            "problem": "$\\int 2x\\cos(x^2) \\, dx$",
+            "answer": "$\\sin(x^2) + C$"
+        },
+        {
+            "id": 41,
+            "problem": "$\\int x^3 \\, dx$",
+            "answer": "$\\frac{x^4}{4} + C$"
+        },
+        {
+            "id": 42,
+            "problem": "$\\int (3x^2 + 2x) \\, dx$",
+            "answer": "$x^3 + x^2 + C$"
+        },
+        {
+            "id": 43,
+            "problem": "$\\int \\frac{1}{x} \\, dx$",
+            "answer": "$\\ln|x| + C$"
+        },
+        {
+            "id": 44,
+            "problem": "$\\int e^x \\, dx$",
+            "answer": "$e^x + C$"
+        },
+        {
+            "id": 45,
+            "problem": "$\\int \\cos(x) \\, dx$",
+            "answer": "$\\sin(x) + C$"
+        },
+        {
+            "id": 46,
+            "problem": "$\\int \\sin(x) \\, dx$",
+            "answer": "$-\\cos(x) + C$"
+        },
+        {
+            "id": 47,
+            "problem": "$\\int \\sec^2(x) \\, dx$",
+            "answer": "$\\tan(x) + C$"
+        },
+        {
+            "id": 48,
+            "problem": "$\\int (4x^3 - 6x^2 + 2) \\, dx$",
+            "answer": "$x^4 - 2x^3 + 2x + C$"
+        },
+        {
+            "id": 49,
+            "problem": "$\\int \\frac{1}{x^2} \\, dx$",
+            "answer": "$-\\frac{1}{x} + C$"
+        },
+        {
+            "id": 50,
+            "problem": "$\\int 2e^{2x} \\, dx$",
+            "answer": "$e^{2x} + C$"
+        },
+        {
+            "id": 51,
+            "problem": "$\\int \\sqrt{x} \\, dx$",
+            "answer": "$\\frac{2x^{3/2}}{3} + C$"
+        },
+        {
+            "id": 52,
+            "problem": "$\\int \\frac{1}{\\sqrt{x}} \\, dx$",
+            "answer": "$2\\sqrt{x} + C$"
+        },
+        {
+            "id": 53,
+            "problem": "$\\int (x+1)^2 \\, dx$",
+            "answer": "$\\frac{(x+1)^3}{3} + C$"
+        },
+        {
+            "id": 54,
+            "problem": "$\\int 3\\sin(2x) \\, dx$",
+            "answer": "$-\\frac{3\\cos(2x)}{2} + C$"
+        },
+        {
+            "id": 55,
+            "problem": "$\\int \\frac{5}{x} \\, dx$",
+            "answer": "$5\\ln|x| + C$"
+        },
+        {
+            "id": 56,
+            "problem": "$\\int (x^2 + 1)^2 \\, dx$",
+            "answer": "$\\frac{x^5}{5} + \\frac{2x^3}{3} + x + C$"
+        },
+        {
+            "id": 57,
+            "problem": "$\\int \\sec(x)\\tan(x) \\, dx$",
+            "answer": "$\\sec(x) + C$"
+        },
+        {
+            "id": 58,
+            "problem": "$\\int e^{-x} \\, dx$",
+            "answer": "$-e^{-x} + C$"
+        },
+        {
+            "id": 59,
+            "problem": "$\\int \\frac{1}{1+x^2} \\, dx$",
+            "answer": "$\\arctan(x) + C$"
+        },
+        {
+            "id": 60,
+            "problem": "$\\int x\\sqrt{x} \\, dx$",
+            "answer": "$\\frac{2x^{5/2}}{5} + C$"
+        },
+        {
+            "id": 61,
+            "problem": "$\\int \\frac{1}{\\sqrt{1-x^2}} \\, dx$",
+            "answer": "$\\arcsin(x) + C$"
+        },
+        {
+            "id": 62,
+            "problem": "$\\int 4\\cos(3x) \\, dx$",
+            "answer": "$\\frac{4\\sin(3x)}{3} + C$"
+        },
+        {
+            "id": 63,
+            "problem": "$\\int (2x-3)^3 \\, dx$",
+            "answer": "$\\frac{(2x-3)^4}{8} + C$"
+        },
+        {
+            "id": 64,
+            "problem": "$\\int x^{-3} \\, dx$",
+            "answer": "$-\\frac{1}{2x^2} + C$"
+        },
+        {
+            "id": 65,
+            "problem": "$\\int 5e^{x/2} \\, dx$",
+            "answer": "$10e^{x/2} + C$"
+        },
+        {
+            "id": 66,
+            "problem": "$\\int (x^4 - 3x + 7) \\, dx$",
+            "answer": "$\\frac{x^5}{5} - \\frac{3x^2}{2} + 7x + C$"
+        },
+        {
+            "id": 67,
+            "problem": "$\\int \\csc^2(x) \\, dx$",
+            "answer": "$-\\cot(x) + C$"
+        },
+        {
+            "id": 68,
+            "problem": "$\\int \\frac{2x}{x^2+1} \\, dx$",
+            "answer": "$\\ln(x^2+1) + C$"
+        },
+        {
+            "id": 69,
+            "problem": "$\\int x^2e^{x^3} \\, dx$",
+            "answer": "$\\frac{e^{x^3}}{3} + C$"
+        },
+        {
+            "id": 70,
+            "problem": "$\\int \\sin^2(x)\\cos(x) \\, dx$",
+            "answer": "$\\frac{\\sin^3(x)}{3} + C$"
+        },
+        {
+            "id": 71,
+            "problem": "$\\int \\frac{6x^2}{x^3+1} \\, dx$",
+            "answer": "$2\\ln|x^3+1| + C$"
+        },
+        {
+            "id": 72,
+            "problem": "$\\int (5x^4 + 2x^2 - 1) \\, dx$",
+            "answer": "$x^5 + \\frac{2x^3}{3} - x + C$"
+        },
+        {
+            "id": 73,
+            "problem": "$\\int \\frac{e^x}{e^x+1} \\, dx$",
+            "answer": "$\\ln(e^x+1) + C$"
+        },
+        {
+            "id": 74,
+            "problem": "$\\int x(x^2+1)^2 \\, dx$",
+            "answer": "$\\frac{(x^2+1)^3}{6} + C$"
+        },
+        {
+            "id": 75,
+            "problem": "$\\int \\tan^2(x) \\, dx$",
+            "answer": "$\\tan(x) - x + C$"
+        },
+        {
+            "id": 76,
+            "problem": "$\\int \\frac{3}{2x+1} \\, dx$",
+            "answer": "$\\frac{3\\ln|2x+1|}{2} + C$"
+        },
+        {
+            "id": 77,
+            "problem": "$\\int xe^{x^2} \\, dx$",
+            "answer": "$\\frac{e^{x^2}}{2} + C$"
+        },
+        {
+            "id": 78,
+            "problem": "$\\int (3\\sin(x) + 4\\cos(x)) \\, dx$",
+            "answer": "$-3\\cos(x) + 4\\sin(x) + C$"
+        },
+        {
+            "id": 79,
+            "problem": "$\\int \\frac{x}{\\sqrt{x^2+1}} \\, dx$",
+            "answer": "$\\sqrt{x^2+1} + C$"
+        },
+        {
+            "id": 80,
+            "problem": "$\\int (x+2)(x-3) \\, dx$",
+            "answer": "$\\frac{x^3}{3} - \\frac{x^2}{2} - 6x + C$"
+        },
+        {
+            "id": 81,
+            "problem": "$\\int x^2 \\, dx$",
+            "answer": "$\\frac{x^3}{3} + C$"
+        },
+        {
+            "id": 82,
+            "problem": "$\\int 3x^4 \\, dx$",
+            "answer": "$\\frac{3x^5}{5} + C$"
+        },
+        {
+            "id": 83,
+            "problem": "$\\int \\frac{1}{x} \\, dx$",
+            "answer": "$\\ln|x| + C$"
+        },
+        {
+            "id": 84,
+            "problem": "$\\int e^x \\, dx$",
+            "answer": "$e^x + C$"
+        },
+        {
+            "id": 85,
+            "problem": "$\\int \\cos(x) \\, dx$",
+            "answer": "$\\sin(x) + C$"
+        },
+        {
+            "id": 86,
+            "problem": "$\\int \\sin(x) \\, dx$",
+            "answer": "$-\\cos(x) + C$"
+        },
+        {
+            "id": 87,
+            "problem": "$\\int \\sec^2(x) \\, dx$",
+            "answer": "$\\tan(x) + C$"
+        },
+        {
+            "id": 88,
+            "problem": "$\\int (2x + 3) \\, dx$",
+            "answer": "$x^2 + 3x + C$"
+        },
+        {
+            "id": 89,
+            "problem": "$\\int x^{-3} \\, dx$",
+            "answer": "$-\\frac{1}{2x^2} + C$"
+        },
+        {
+            "id": 90,
+            "problem": "$\\int 5e^{2x} \\, dx$",
+            "answer": "$\\frac{5e^{2x}}{2} + C$"
+        },
+        {
+            "id": 91,
+            "problem": "$\\int \\sqrt{x} \\, dx$",
+            "answer": "$\\frac{2x^{3/2}}{3} + C$"
+        },
+        {
+            "id": 92,
+            "problem": "$\\int \\frac{1}{x^2} \\, dx$",
+            "answer": "$-\\frac{1}{x} + C$"
+        },
+        {
+            "id": 93,
+            "problem": "$\\int (x^2 + 2x - 1) \\, dx$",
+            "answer": "$\\frac{x^3}{3} + x^2 - x + C$"
+        },
+        {
+            "id": 94,
+            "problem": "$\\int \\sin(3x) \\, dx$",
+            "answer": "$-\\frac{\\cos(3x)}{3} + C$"
+        },
+        {
+            "id": 95,
+            "problem": "$\\int \\frac{1}{1+x^2} \\, dx$",
+            "answer": "$\\arctan(x) + C$"
+        },
+        {
+            "id": 96,
+            "problem": "$\\int 4\\cos(2x) \\, dx$",
+            "answer": "$2\\sin(2x) + C$"
+        },
+        {
+            "id": 97,
+            "problem": "$\\int x e^{x^2} \\, dx$",
+            "answer": "$\\frac{e^{x^2}}{2} + C$"
+        },
+        {
+            "id": 98,
+            "problem": "$\\int \\frac{2x}{x^2+1} \\, dx$",
+            "answer": "$\\ln(x^2+1) + C$"
+        },
+        {
+            "id": 99,
+            "problem": "$\\int (3x^2 - 4x + 5) \\, dx$",
+            "answer": "$x^3 - 2x^2 + 5x + C$"
+        },
+        {
+            "id": 100,
+            "problem": "$\\int \\frac{1}{\\sqrt{1-x^2}} \\, dx$",
+            "answer": "$\\arcsin(x) + C$"
+        },
+        {
+            "id": 101,
+            "problem": "$\\int x^3 \\, dx$",
+            "answer": "$\\frac{x^4}{4} + C$"
+        },
+        {
+            "id": 102,
+            "problem": "$\\int 6x^5 \\, dx$",
+            "answer": "$x^6 + C$"
+        },
+        {
+            "id": 103,
+            "problem": "$\\int \\sec(x)\\tan(x) \\, dx$",
+            "answer": "$\\sec(x) + C$"
+        },
+        {
+            "id": 104,
+            "problem": "$\\int e^{-x} \\, dx$",
+            "answer": "$-e^{-x} + C$"
+        },
+        {
+            "id": 105,
+            "problem": "$\\int \\frac{3}{x} \\, dx$",
+            "answer": "$3\\ln|x| + C$"
+        },
+        {
+            "id": 106,
+            "problem": "$\\int (x+1)^2 \\, dx$",
+            "answer": "$\\frac{(x+1)^3}{3} + C$"
+        },
+        {
+            "id": 107,
+            "problem": "$\\int \\frac{1}{x^3} \\, dx$",
+            "answer": "$-\\frac{1}{2x^2} + C$"
+        },
+        {
+            "id": 108,
+            "problem": "$\\int 2\\sin(x)\\cos(x) \\, dx$",
+            "answer": "$\\sin^2(x) + C$"
+        },
+        {
+            "id": 109,
+            "problem": "$\\int x\\sqrt{x} \\, dx$",
+            "answer": "$\\frac{2x^{5/2}}{5} + C$"
+        },
+        {
+            "id": 110,
+            "problem": "$\\int (e^x + e^{-x}) \\, dx$",
+            "answer": "$e^x - e^{-x} + C$"
+        },
+        {
+            "id": 111,
+            "problem": "$\\int \\frac{5}{2x} \\, dx$",
+            "answer": "$\\frac{5}{2}\\ln|x| + C$"
+        },
+        {
+            "id": 112,
+            "problem": "$\\int \\cos(5x) \\, dx$",
+            "answer": "$\\frac{\\sin(5x)}{5} + C$"
+        },
+        {
+            "id": 113,
+            "problem": "$\\int (4x^3 - 3x^2 + 2x) \\, dx$",
+            "answer": "$x^4 - x^3 + x^2 + C$"
+        },
+        {
+            "id": 114,
+            "problem": "$\\int \\frac{e^x}{e^x+1} \\, dx$",
+            "answer": "$\\ln(e^x+1) + C$"
+        },
+        {
+            "id": 115,
+            "problem": "$\\int x^{-1/2} \\, dx$",
+            "answer": "$2\\sqrt{x} + C$"
+        },
+        {
+            "id": 116,
+            "problem": "$\\int 3e^{3x} \\, dx$",
+            "answer": "$e^{3x} + C$"
+        },
+        {
+            "id": 117,
+            "problem": "$\\int (2x-1)^3 \\, dx$",
+            "answer": "$\\frac{(2x-1)^4}{8} + C$"
+        },
+        {
+            "id": 118,
+            "problem": "$\\int \\tan^2(x) \\, dx$",
+            "answer": "$\\tan(x) - x + C$"
+        },
+        {
+            "id": 119,
+            "problem": "$\\int \\frac{x}{\\sqrt{x^2+1}} \\, dx$",
+            "answer": "$\\sqrt{x^2+1} + C$"
+        },
+        {
+            "id": 120,
+            "problem": "$\\int (1+x)^{-1} \\, dx$",
+            "answer": "$\\ln|1+x| + C$"
         }
     ]
 }
