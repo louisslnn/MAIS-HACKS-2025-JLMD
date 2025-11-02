@@ -117,7 +117,7 @@ export function MatchResults({ match, userId, onPlayAgain }: MatchResultsProps) 
           <div className="mb-4">
             <p className="text-sm text-ink-soft mb-2">Final Score</p>
             <div className="text-6xl font-bold text-ink">
-              {player.score}
+              {player.correctCount}/{match.settings.rounds || 10}
             </div>
             <p className="text-lg text-ink-soft mt-2">
               {player.correctCount} out of {match.settings.rounds || 10} correct
@@ -150,7 +150,7 @@ export function MatchResults({ match, userId, onPlayAgain }: MatchResultsProps) 
           <div className="space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-ink-soft">Final Score</span>
-              <span className="text-3xl font-bold text-brand">{player.score}</span>
+              <span className="text-3xl font-bold text-brand">{player.correctCount}/{match.settings.rounds || 10}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-ink-soft">Correct Answers</span>

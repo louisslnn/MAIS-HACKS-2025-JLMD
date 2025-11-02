@@ -125,72 +125,137 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
         console.log("All pages captured, processing with OCR...", newScreenshots.length);
         setIsProcessingOCR(true);
         
-        // Simulate OCR processing
+        // Call real OCR processing
         setTimeout(async () => {
-          console.log("Writing mode complete, all screenshots captured");
+          console.log("Writing mode complete, processing with OCR...", newScreenshots.length);
           
-          // Simulate OCR results: randomly mark some as correct
-          // In production, this would call verifyWrittenAnswers and parse results
-          if (match.mode === "solo" && state.rounds) {
-            const totalRounds = state.rounds.length;
-            let correctCount = 0;
-            const baseScore = 100; // Base points per correct answer
-            
-            // Simulate OCR results: 60-80% accuracy
-            const accuracy = 0.6 + Math.random() * 0.2; // 60-80% correct
-            const expectedCorrect = Math.floor(totalRounds * accuracy);
-            
-            // Submit answers for all rounds with simulated correctness
-            state.rounds.forEach((round, index) => {
-              if (round.status !== "locked") {
-                // Simulate correct/incorrect based on expected accuracy
-                const isCorrect = index < expectedCorrect;
-                if (isCorrect) correctCount++;
+          if (match.mode === "solo" && state.rounds && newScreenshots.length > 0) {
+            try {
+              // Build submissions for OCR - group problems by page
+              const submissions: Array<{
+                pageNumber: number;
+                imageBase64: string;
+                problemIds: string[];
+                expectedAnswers: Array<{ id: string; answer: string; type: string }>;
+              }> = [];
+              
+              // Group rounds into pages (same logic as pages array)
+              const problemsPerPage = isIntegral ? 1 : 3;
+              let pageIndex = 0;
+              
+              for (let i = 0; i < state.rounds.length; i += problemsPerPage) {
+                const pageRounds = state.rounds.slice(i, i + problemsPerPage);
+                const expectedAnswers = pageRounds.map((round) => {
+                  let expectedAnswer: string;
+                  let problemType: string;
+                  
+                  if (round.canonical.type === "addition") {
+                    const params = round.canonical.params as { a: number; b: number; answer: number };
+                    expectedAnswer = String(params.answer);
+                    problemType = "addition";
+                  } else if (round.canonical.type === "integral") {
+                    const params = round.canonical.params as { answer: string };
+                    expectedAnswer = params.answer || "";
+                    problemType = "integral";
+                  } else {
+                    expectedAnswer = "";
+                    problemType = "unknown";
+                  }
+                  
+                  // Use numeric ID for OCR (round.id is "1", "2", etc.)
+                  return {
+                    id: String(parseInt(round.id, 10) || round.id),
+                    answer: expectedAnswer,
+                    type: problemType,
+                  };
+                });
                 
-                // Get expected answer from canonical params
-                let answerValue: string;
-                if (round.canonical.type === "addition") {
-                  const params = round.canonical.params as { a: number; b: number; answer: number };
-                  answerValue = String(isCorrect ? params.answer : params.answer + Math.floor(Math.random() * 10) + 1);
-                } else {
-                  // For integrals, just use a placeholder
-                  answerValue = isCorrect ? "correct" : "incorrect";
+                if (pageIndex < newScreenshots.length) {
+                  submissions.push({
+                    pageNumber: pageIndex + 1,
+                    imageBase64: newScreenshots[pageIndex],
+                    problemIds: pageRounds.map(r => r.id),
+                    expectedAnswers,
+                  });
                 }
                 
-                submitPracticeAnswer(round.id, answerValue);
+                pageIndex++;
               }
-            });
-            
-            // Calculate and update score
-            const calculatedScore = correctCount * baseScore;
-            
-            // Update player stats in match state
-            if (state.match && state.match.players) {
-              const playerId = state.match.playerIds[0];
-              const player = state.match.players[playerId];
-              if (player) {
-                player.score = calculatedScore;
-                player.correctCount = correctCount;
-                player.totalTimeMs = totalRounds * 5000; // Simulated time: 5s per problem
+              
+              // Call the OCR Cloud Function
+              console.log("Calling verifyWrittenAnswers with", submissions.length, "submissions");
+              const ocrResult = await verifyWrittenAnswers({ submissions });
+              
+              if (!ocrResult.data || !ocrResult.data.success) {
+                throw new Error(ocrResult.data?.error || "OCR processing failed");
               }
-            }
-            
-            // Mark match as completed after a short delay
-            setTimeout(() => {
-              if (state.match) {
+              
+              console.log("OCR Results:", ocrResult.data.results);
+              
+              // Parse OCR results and update scores
+              let correctCount = 0;
+              const totalRounds = state.rounds.length;
+              
+              // Map OCR results to rounds - need to match by problem order
+              // OCR returns results in order of problems on each page
+              let resultIndex = 0;
+              
+              for (let i = 0; i < state.rounds.length; i += problemsPerPage) {
+                const pageRounds = state.rounds.slice(i, i + problemsPerPage);
+                
+                pageRounds.forEach((round) => {
+                  if (resultIndex < ocrResult.data.results.length) {
+                    const result = ocrResult.data.results[resultIndex];
+                    
+                    // Get the expected answer
+                    let answerValue: string;
+                    if (round.canonical.type === "addition") {
+                      const params = round.canonical.params as { a: number; b: number; answer: number };
+                      answerValue = String(params.answer);
+                    } else {
+                      const params = round.canonical.params as { answer: string };
+                      answerValue = params.answer || "";
+                    }
+                    
+                    // Submit the answer
+                    submitPracticeAnswer(round.id, answerValue);
+                    
+                    if (result.is_correct) {
+                      correctCount++;
+                    }
+                    
+                    resultIndex++;
+                  }
+                });
+              }
+              
+              // Update player stats
+              if (state.match && state.match.players) {
+                const playerId = state.match.playerIds[0];
+                const player = state.match.players[playerId];
+                if (player) {
+                  player.correctCount = correctCount;
+                  player.score = correctCount; // Score is just the count (will display as X/15 or X/3)
+                  player.totalTimeMs = totalRounds * 5000; // Simulated time
+                }
+                
+                // Mark match as completed
                 state.match.status = "completed";
               }
-            }, 500);
+              
+              setIsProcessingOCR(false);
+              
+            } catch (error) {
+              console.error("OCR processing error:", error);
+              setIsProcessingOCR(false);
+              
+              // Fallback: show error message
+              alert(`OCR Processing Error: ${error instanceof Error ? error.message : "Unknown error"}\n\nPlease try again.`);
+            }
+          } else {
+            setIsProcessingOCR(false);
           }
-          
-          setIsProcessingOCR(false);
-          
-          // In production with real OCR:
-          // 1. Call verifyWrittenAnswers with newScreenshots
-          // 2. Parse OCR results to get correct/incorrect for each problem
-          // 3. Update player.score, player.correctCount based on OCR results
-          // 4. Display in MatchResults
-        }, 2000);
+        }, 1000);
       }
     } catch (error) {
       console.error("Screenshot capture failed:", error);
