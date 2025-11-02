@@ -37,6 +37,7 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
   const [capturedScreenshots, setCapturedScreenshots] = useState<string[]>([]);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [isProcessingOCR, setIsProcessingOCR] = useState(false);
 
   const currentUserAnswer = useMemo(() => {
     if (!activeRound) return null;
@@ -122,14 +123,20 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
       } else {
         // All pages captured, trigger OCR processing
         console.log("All pages captured, processing with OCR...", newScreenshots.length);
+        setIsProcessingOCR(true);
         
-        // Build submissions for OCR
-        // TODO: Extract actual problem data and expected answers from rounds
-        // For now, this is a placeholder that needs to be integrated with the match context
-        
-        // Mark match as completed (this will trigger the MatchResults view)
-        // The actual OCR processing will happen there
-        console.log("Writing mode complete, all screenshots captured");
+        // Simulate OCR processing (replace with actual OCR call later)
+        setTimeout(() => {
+          console.log("Writing mode complete, all screenshots captured");
+          setIsProcessingOCR(false);
+          // TODO: Call verifyWrittenAnswers here with all screenshots
+          // TODO: Navigate to results page or mark match as complete
+          alert("OCR Processing Complete!\n\nThis is where the results would be displayed.\n\n" +
+                "Next steps:\n" +
+                "1. Extract problem data from rounds\n" +
+                "2. Call verifyWrittenAnswers function\n" +
+                "3. Display results in MatchResults component");
+        }, 2000);
       }
     } catch (error) {
       console.error("Screenshot capture failed:", error);
@@ -165,9 +172,18 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
           <div className="inline-block px-4 py-2 rounded-full bg-brand/10 text-brand text-sm font-medium">
             📝 Writing Mode - Page {currentPageIndex + 1} of {totalPages}
           </div>
-          {capturedScreenshots.length > 0 && (
+          {capturedScreenshots.length > 0 && !isProcessingOCR && (
             <div className="text-sm text-ink-soft">
               {capturedScreenshots.length} page(s) submitted
+            </div>
+          )}
+          {isProcessingOCR && (
+            <div className="flex items-center gap-2 text-sm text-brand font-medium">
+              <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Processing with AI...
             </div>
           )}
         </div>
@@ -230,28 +246,47 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
         </div>
 
         {/* Submit Page Button */}
-        <div className="flex justify-center">
-          <Button
-            size="lg"
-            onClick={handleCaptureScreenshot}
-            disabled={isCapturing}
-            className="px-8"
-          >
-            {isCapturing ? (
-              <>
-                <svg className="animate-spin -ml-1 mr-3 h-5 w-5" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Capturing...
-              </>
-            ) : currentPageIndex === totalPages - 1 ? (
-              `Submit Final Page & Process`
-            ) : (
-              `Submit Page ${currentPageIndex + 1} of ${totalPages}`
-            )}
-          </Button>
-        </div>
+        {!isProcessingOCR ? (
+          <div className="flex justify-center">
+            <Button
+              size="lg"
+              onClick={handleCaptureScreenshot}
+              disabled={isCapturing}
+              className="px-8"
+            >
+              {isCapturing ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Capturing...
+                </>
+              ) : currentPageIndex === totalPages - 1 ? (
+                `Submit Final Page & Process`
+              ) : (
+                `Submit Page ${currentPageIndex + 1} of ${totalPages}`
+              )}
+            </Button>
+          </div>
+        ) : (
+          <div className="rounded-2xl bg-brand/5 border border-brand/20 p-8 text-center">
+            <div className="flex flex-col items-center gap-4">
+              <svg className="animate-spin h-12 w-12 text-brand" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <div>
+                <h3 className="text-xl font-semibold text-ink mb-2">
+                  🤖 AI is checking your answers...
+                </h3>
+                <p className="text-sm text-ink-soft">
+                  Using Claude Sonnet 4.5 to verify your handwritten solutions
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
