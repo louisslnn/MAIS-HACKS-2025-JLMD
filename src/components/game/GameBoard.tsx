@@ -20,7 +20,7 @@ interface GameBoardProps {
 
 export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
   const { user } = useAuth();
-  const { opponentState, state, submitPracticeAnswer, applyPracticeOcrResults } = useMatch();
+  const { opponentState, state, submitPracticeAnswer, applyPracticeOcrResults, setPracticeFeedback, completePracticeMatch } = useMatch();
   const currentUserId = user?.uid;
   
   const isWritingMode = match.settings.writingMode === true;
@@ -138,18 +138,9 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
       if (feedbackResponse.data?.success && feedbackResponse.data.feedback) {
         console.log("[GameBoard] AI feedback generated successfully:", feedbackResponse.data.feedback);
         
-        // Store in localStorage for MatchResults to retrieve
-        try {
-          const storageKey = `practice-feedback-${match.id}`;
-          console.log("[GameBoard] Storing feedback with key:", storageKey);
-          localStorage.setItem(storageKey, feedbackResponse.data.feedback);
-          console.log("[GameBoard] Feedback stored successfully");
-          
-          // Also set in state so it can be passed to MatchResults
-          setAiFeedback(feedbackResponse.data.feedback);
-        } catch (error) {
-          console.error("[GameBoard] Failed to store feedback in localStorage:", error);
-        }
+        // Store feedback in context state (not localStorage)
+        setPracticeFeedback(feedbackResponse.data.feedback);
+        console.log("[GameBoard] Feedback stored in context");
       } else {
         console.error("[GameBoard] Failed to generate AI feedback:", feedbackResponse.data?.error);
       }
@@ -159,9 +150,12 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
       // Always clear accumulated results and reset processing state
       accumulatedResultsRef.current = [];
       setIsProcessingFinal(false);
-      console.log("[GameBoard] Final processing complete, match should now show as completed");
+      
+      // Now complete the match (this triggers navigation to results)
+      completePracticeMatch();
+      console.log("[GameBoard] Final processing complete, match completed");
     }
-  }, [submitPracticeAnswer]);
+  }, [submitPracticeAnswer, setPracticeFeedback, completePracticeMatch]);
 
   const handleCaptureScreenshot = useCallback(async () => {
     if (!screenshotAreaRef.current) return;

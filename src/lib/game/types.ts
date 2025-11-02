@@ -83,8 +83,8 @@ export interface MatchState {
   match: MatchDocument | null;
   rounds: RoundDocument[];
   answers: Record<string, AnswerDocument[]>;
-  isLoading: boolean;
-  error?: string;
+  activeRoundIndex: number;
+  practiceFeedback?: string | null;
 }
 
 export interface OCRVerificationResult {

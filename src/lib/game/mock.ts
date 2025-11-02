@@ -87,7 +87,8 @@ export const mockState: MatchState = {
   match: mockMatch,
   rounds: mockRounds,
   answers: mockAnswers,
-  isLoading: false,
+  activeRoundIndex: 0,
+  practiceFeedback: null,
 };
 
 export function createMockState(mode: MatchMode, options?: { writingMode?: boolean; problemCategory?: "addition" | "integrals" }): MatchState {
@@ -201,10 +202,11 @@ export function createMockState(mode: MatchMode, options?: { writingMode?: boole
         updatedAt: nowIso,
         seed: `practice-seed-${timestamp}`,
       },
-      rounds: practiceRounds,
-      answers: {},
-      isLoading: false,
-    };
+    rounds: practiceRounds,
+    answers: {},
+    activeRoundIndex: 0,
+    practiceFeedback: null,
+  };
   }
 
   const matchClone: MatchDocument = {
@@ -236,6 +238,7 @@ export function createMockState(mode: MatchMode, options?: { writingMode?: boole
     match: matchClone,
     rounds: roundsClone,
     answers: answersClone,
-    isLoading: false,
+    activeRoundIndex: 0,
+    practiceFeedback: null,
   };
 }

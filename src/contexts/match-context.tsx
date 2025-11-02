@@ -61,6 +61,8 @@ interface MatchContextValue {
     confidence: number;
     notes: string;
   }>) => void;
+  setPracticeFeedback: (feedback: string) => void;
+  completePracticeMatch: () => void;
   quitMatch: () => Promise<void>;
 }
 
@@ -74,7 +76,8 @@ export function MatchProvider({ children }: { children: React.ReactNode }) {
     match: null,
     rounds: [],
     answers: {},
-    isLoading: false,
+    activeRoundIndex: 0,
+    practiceFeedback: null,
   });
   const [matchmakingStatus, setMatchmakingStatus] = useState<MatchmakingStatus>("idle");
   const [matchmakingError, setMatchmakingError] = useState<string | null>(null);
@@ -290,7 +293,8 @@ export function MatchProvider({ children }: { children: React.ReactNode }) {
         match: null,
         rounds: [],
         answers: {},
-        isLoading: false,
+        activeRoundIndex: 0,
+        practiceFeedback: null,
       });
       return;
     }
@@ -317,7 +321,8 @@ export function MatchProvider({ children }: { children: React.ReactNode }) {
         match: null,
         rounds: [],
         answers: {},
-        isLoading: false,
+        activeRoundIndex: 0,
+        practiceFeedback: null,
       });
     }
   }, []);
@@ -435,7 +440,8 @@ export function MatchProvider({ children }: { children: React.ReactNode }) {
       match: null,
       rounds: [],
       answers: {},
-      isLoading: false,
+      activeRoundIndex: 0,
+      practiceFeedback: null,
     });
     
     if (matchmakingUnsubscribeRef.current) {
@@ -615,6 +621,29 @@ export function MatchProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const setPracticeFeedback = useCallback((feedback: string) => {
+    console.log("[MatchContext] Setting practice feedback:", feedback);
+    setState((prev) => ({
+      ...prev,
+      practiceFeedback: feedback,
+    }));
+  }, []);
+
+  const completePracticeMatch = useCallback(() => {
+    console.log("[MatchContext] Completing practice match");
+    setState((prev) => {
+      if (!prev.match || prev.match.mode !== "solo") return prev;
+      
+      return {
+        ...prev,
+        match: {
+          ...prev.match,
+          status: "completed" as const,
+        },
+      };
+    });
+  }, []);
+
   const quitMatch = useCallback(async () => {
     if (!state.match || !user) return;
 
@@ -627,7 +656,8 @@ export function MatchProvider({ children }: { children: React.ReactNode }) {
         match: null,
         rounds: [],
         answers: {},
-        isLoading: false,
+        activeRoundIndex: 0,
+        practiceFeedback: null,
       });
     } catch (error) {
       console.error("Failed to quit match:", error);
@@ -637,7 +667,8 @@ export function MatchProvider({ children }: { children: React.ReactNode }) {
         match: null,
         rounds: [],
         answers: {},
-        isLoading: false,
+        activeRoundIndex: 0,
+        practiceFeedback: null,
       });
     }
   }, [state.match, user]);
@@ -663,6 +694,8 @@ export function MatchProvider({ children }: { children: React.ReactNode }) {
       opponentState,
       submitPracticeAnswer,
       applyPracticeOcrResults,
+      setPracticeFeedback,
+      completePracticeMatch,
       quitMatch,
     }),
     [
@@ -676,6 +709,8 @@ export function MatchProvider({ children }: { children: React.ReactNode }) {
       opponentState,
       submitPracticeAnswer,
       applyPracticeOcrResults,
+      setPracticeFeedback,
+      completePracticeMatch,
       quitMatch,
     ],
   );

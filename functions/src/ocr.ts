@@ -102,6 +102,15 @@ CRITICAL - YOU MUST SOLVE ALL PROBLEMS:
 - Compare the user's handwritten answer with YOUR calculated solution
 - Accept any mathematically equivalent form
 
+CRITICAL - FOR ADDITION PROBLEMS ONLY:
+- Addition answers MUST be pure numbers (e.g., "52", "68", "125")
+- If you see letters mixed with numbers (e.g., "5a", "6b", "8s"), interpret ONLY as numbers:
+  * "5a" → likely means "52" (cursive/unclear "2")
+  * "8s" → likely means "85" (unclear "5")
+  * Focus on the numeric digits, ignore letter-like marks
+- If the answer contains ONLY letters with no clear numbers, mark as incorrect
+- Be strict: Addition problems NEVER have letters in answers
+
 IMPORTANT - EQUIVALENT ANSWERS ARE CORRECT:
 - Fractions: Accept equivalent forms (e.g., 1/2 = 2/4 = 0.5 = 50%)
 - Decimals: Accept fraction equivalents (e.g., 0.5 = 1/2 = 5/10)

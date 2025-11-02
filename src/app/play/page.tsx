@@ -130,6 +130,7 @@ export default function PlayPage() {
             match={state.match} 
             userId={user.uid} 
             onPlayAgain={handlePlayAgain}
+            aiFeedback={state.practiceFeedback}
           />
         </div>
       </div>
