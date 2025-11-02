@@ -479,7 +479,9 @@ export function MatchProvider({ children }: { children: React.ReactNode }) {
       const timeMs = Math.max(0, now - roundStart);
       const inTime = timeMs <= DEFAULT_ROUND_DURATION_MS;
       
-      const actuallyCorrect = correct && inTime;
+      // For OCR mode (isCorrect provided), don't check inTime - all correct answers count
+      // For typing mode, require both correct and inTime
+      const actuallyCorrect = isCorrect !== undefined ? correct : (correct && inTime);
       
       // Create answer document
       const answerDoc: AnswerDocument = {
