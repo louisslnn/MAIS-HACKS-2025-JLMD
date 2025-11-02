@@ -53,7 +53,7 @@ interface MatchContextValue {
   matchmakingError: string | null;
   cancelMatchmaking: () => Promise<void>;
   opponentState: OpponentState | null;
-  submitPracticeAnswer: (roundId: string, value: string | number) => void;
+  submitPracticeAnswer: (roundId: string, value: string | number, isCorrect?: boolean) => void;
   quitMatch: () => Promise<void>;
 }
 
@@ -448,7 +448,7 @@ export function MatchProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   // Handle practice mode answer submission
-  const submitPracticeAnswer = useCallback((roundId: string, value: string | number) => {
+  const submitPracticeAnswer = useCallback((roundId: string, value: string | number, isCorrect?: boolean) => {
     if (!state.match || !state.match.id.startsWith("practice-")) return;
     
     setState((prev) => {
@@ -458,8 +458,14 @@ export function MatchProvider({ children }: { children: React.ReactNode }) {
       if (!currentRound || currentRound.status !== "active" || !currentRound.startAt) return prev;
       
       // Calculate if answer is correct
-      const numericValue = typeof value === "string" ? Number(value) : value;
-      const correct = currentRound.canonical?.params?.answer === numericValue;
+      // If isCorrect is provided (from OCR), use that; otherwise calculate
+      let correct: boolean;
+      if (isCorrect !== undefined) {
+        correct = isCorrect;
+      } else {
+        const numericValue = typeof value === "string" ? Number(value) : value;
+        correct = currentRound.canonical?.params?.answer === numericValue;
+      }
       
       const now = Date.now();
       const roundStart = new Date(currentRound.startAt).getTime();

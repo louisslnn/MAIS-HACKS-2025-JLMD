@@ -196,7 +196,7 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
               let correctCount = 0;
               const totalRounds = state.rounds.length;
               
-              // Map OCR results to rounds
+              // Map OCR results to rounds and submit answers with OCR correctness
               // OCR returns results in order with numeric IDs matching the expectedAnswers IDs
               ocrResult.data.results.forEach((result) => {
                 // Find the round by matching the numeric ID
@@ -204,7 +204,7 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
                 const round = state.rounds.find(r => r.id === roundId);
                 
                 if (round) {
-                  // Get the expected answer
+                  // Get the expected answer (for display purposes)
                   let answerValue: string;
                   if (round.canonical.type === "addition") {
                     const params = round.canonical.params as { a: number; b: number; answer: number };
@@ -214,8 +214,8 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
                     answerValue = params.answer || "";
                   }
                   
-                  // Submit the answer
-                  submitPracticeAnswer(round.id, answerValue);
+                  // Submit the answer with OCR-determined correctness
+                  submitPracticeAnswer(round.id, answerValue, result.is_correct);
                   
                   if (result.is_correct) {
                     correctCount++;
@@ -223,20 +223,8 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
                 }
               });
               
-              // Update player stats
-              if (state.match && state.match.players) {
-                const playerId = state.match.playerIds[0];
-                const player = state.match.players[playerId];
-                if (player) {
-                  player.correctCount = correctCount;
-                  player.score = correctCount; // Score is just the count (will display as X/15 or X/3)
-                  player.totalTimeMs = totalRounds * 5000; // Simulated time
-                }
-                
-                // Mark match as completed
-                state.match.status = "completed";
-              }
-              
+              // After all answers are submitted, the state should update automatically
+              // The submitPracticeAnswer function will mark match as completed when all rounds are locked
               setIsProcessingOCR(false);
               
             } catch (error) {
