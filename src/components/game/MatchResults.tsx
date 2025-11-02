@@ -80,6 +80,16 @@ export function MatchResults({ match, userId, onPlayAgain }: MatchResultsProps) 
     );
   }
   
+  // Debug log for practice mode
+  if (isSolo) {
+    console.log("MatchResults - Practice mode:", {
+      correctCount: player.correctCount,
+      score: player.score,
+      totalRounds: match.settings.rounds,
+      player,
+    });
+  }
+  
   let result: string;
   let resultColor: string;
   let bgColor: string;
