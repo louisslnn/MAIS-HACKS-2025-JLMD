@@ -96,13 +96,20 @@ Rules:
 - "id" must be a string matching the problem ID
 - "type" must be a string matching the problem type from the expected list (e.g., "addition", "multiplication", "integral")
 - "is_correct" must be boolean (true/false, lowercase, no quotes)
+  - CRITICAL: If notes contains "no answer provided", "answer box empty", "answer blank", or similar, is_correct MUST be false
+  - is_correct = true ONLY when an answer is clearly visible AND matches the expected answer
+  - is_correct = false if: no answer visible, answer box empty, answer doesn't match, or answer is unclear
 - "confidence" must be a float between 0.0 and 1.0 (how certain you are about this verification)
   - 1.0 = completely certain (problem clearly visible, answer obviously correct/incorrect)
   - 0.9 = very confident (minor ambiguity in handwriting but answer is clear)
   - 0.7-0.8 = moderately confident (some difficulty reading but likely correct assessment)
   - 0.5-0.6 = low confidence (handwriting unclear or problem partially visible)
   - 0.0-0.4 = very uncertain (problem not found or completely illegible)
-- "notes" must be a string (use "" for empty string if answer is correct)
+  - If no answer provided, confidence should be 0.0
+- "notes" must be a string
+  - Use "" for empty string if answer is correct and clearly visible
+  - Include notes when: answer is incorrect, no answer provided, answer box empty, or answer unclear
+  - Examples: "no answer provided", "answer box empty", "wrong answer", "expected 15 got 12"
 - Include ONLY error notes when is_correct is false
 - Include ALL problems from the expected list in order
 - Do NOT add any fields not specified above

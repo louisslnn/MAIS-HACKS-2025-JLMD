@@ -59,16 +59,26 @@ export function MatchResults({ match, userId, onPlayAgain }: MatchResultsProps) 
     setLoading(true);
   }, [match, userId]);
 
-  const player = match.players[userId];
-  const opponentId = match.playerIds.find((id) => id !== userId);
+  // For solo/practice mode, use the first player ID if userId doesn't match
+  const isSolo = match.mode === "solo";
+  const actualPlayerId = isSolo && !match.players[userId] 
+    ? match.playerIds[0] 
+    : userId;
+  
+  const player = match.players[actualPlayerId];
+  const opponentId = match.playerIds.find((id) => id !== actualPlayerId);
   const opponent = opponentId ? match.players[opponentId] : null;
 
   if (!player) {
-    return null;
+    console.warn("MatchResults: No player found", { userId, actualPlayerId, playerIds: match.playerIds, players: Object.keys(match.players) });
+    return (
+      <div className="text-center p-8">
+        <p className="text-red-500">Error: Player data not found</p>
+        <p className="text-sm text-ink-soft mt-2">Player ID: {userId}</p>
+        <p className="text-sm text-ink-soft">Available players: {Object.keys(match.players).join(", ")}</p>
+      </div>
+    );
   }
-
-  // For solo/practice mode, show completion message instead of win/loss
-  const isSolo = match.mode === "solo";
   
   let result: string;
   let resultColor: string;
@@ -117,11 +127,14 @@ export function MatchResults({ match, userId, onPlayAgain }: MatchResultsProps) 
           <div className="mb-4">
             <p className="text-sm text-ink-soft mb-2">Final Score</p>
             <div className="text-6xl font-bold text-ink">
-              {player.correctCount}/{match.settings.rounds || 10}
+              {(player.correctCount ?? 0)}/{match.settings.rounds || 10}
             </div>
             <p className="text-lg text-ink-soft mt-2">
-              {player.correctCount} out of {match.settings.rounds || 10} correct
+              {player.correctCount ?? 0} out of {match.settings.rounds || 10} correct
             </p>
+            {player.correctCount === undefined && (
+              <p className="text-xs text-red-500 mt-2">⚠️ Score not calculated yet</p>
+            )}
           </div>
         )}
         
