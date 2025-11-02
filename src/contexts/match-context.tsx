@@ -455,7 +455,13 @@ export function MatchProvider({ children }: { children: React.ReactNode }) {
       if (!prev.match || !prev.match.id.startsWith("practice-")) return prev;
       
       const currentRound = prev.rounds.find(r => r.id === roundId);
-      if (!currentRound || currentRound.status !== "active" || !currentRound.startAt) return prev;
+      if (!currentRound) return prev;
+      
+      // For writing mode OCR, allow submitting even if round isn't active yet
+      // Otherwise, require active status
+      if (isCorrect === undefined && (currentRound.status !== "active" || !currentRound.startAt)) {
+        return prev;
+      }
       
       // Calculate if answer is correct
       // If isCorrect is provided (from OCR), use that; otherwise calculate
