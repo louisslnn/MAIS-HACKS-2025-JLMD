@@ -474,7 +474,8 @@ export function MatchProvider({ children }: { children: React.ReactNode }) {
       }
       
       const now = Date.now();
-      const roundStart = new Date(currentRound.startAt).getTime();
+      // For OCR mode, rounds might not have startAt, use a default time
+      const roundStart = currentRound.startAt ? new Date(currentRound.startAt).getTime() : now - 5000;
       const timeMs = Math.max(0, now - roundStart);
       const inTime = timeMs <= DEFAULT_ROUND_DURATION_MS;
       
