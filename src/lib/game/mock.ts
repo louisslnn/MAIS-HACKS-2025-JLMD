@@ -6,6 +6,7 @@ import type {
   MatchState,
   RoundDocument,
 } from "./types";
+import { getAllProblems, type Problem } from "./problems";
 
 export const mockMatch: MatchDocument = {
   id: "mock-match",
@@ -104,6 +105,29 @@ export function createMockState(mode: MatchMode, options?: { writingMode?: boole
     const totalRounds = writingMode ? (isIntegral ? 3 : 15) : 10;
     const roundDuration = writingMode ? 300_000 : DEFAULT_ROUND_DURATION_MS; // 5 min for writing mode
     const now = Date.now();
+    const integralPool = isIntegral ? getAllProblems("integrals") : [];
+
+    const sampledIntegrals: Problem[] = [];
+    if (isIntegral) {
+      const pool = [...integralPool];
+      for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+      }
+      while (sampledIntegrals.length < totalRounds) {
+        if (pool.length === 0) {
+          sampledIntegrals.push({
+            id: 0,
+            problem: "$\\int x \\, dx$",
+            answer: "$\\frac{x^2}{2} + C$",
+          });
+        } else {
+          sampledIntegrals.push(
+            pool[sampledIntegrals.length % pool.length],
+          );
+        }
+      }
+    }
     
     // Create practice rounds with proper future timestamps
     const practiceRounds: RoundDocument[] = Array.from({ length: totalRounds }).map((_, index) => {
@@ -116,11 +140,14 @@ export function createMockState(mode: MatchMode, options?: { writingMode?: boole
       let canonical: { type: string; params: Record<string, unknown> };
       
       if (isIntegral) {
-        // Placeholder integrals (will be replaced by backend loading)
-        prompt = `$\\int x^${roundNum} \\, dx$`;
+        const integralProblem = sampledIntegrals[index];
+        prompt = integralProblem.problem;
         canonical = {
           type: "integral",
-          params: { power: roundNum, answer: `$\\frac{x^${roundNum + 1}}{${roundNum + 1}} + C$` },
+          params: {
+            problemId: integralProblem.id,
+            answer: integralProblem.answer,
+          },
         };
       } else {
         // Addition problems

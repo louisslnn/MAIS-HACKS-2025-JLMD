@@ -125,6 +125,21 @@ export interface BackfillUserDocumentsResponse {
 export const backfillUserDocuments: HttpsCallable<{}, BackfillUserDocumentsResponse> = 
   httpsCallable(functions, 'backfillUserDocuments');
 
+export interface AcceptFriendInviteParams {
+  inviterUid: string;
+}
+
+export interface AcceptFriendInviteResponse {
+  success: boolean;
+  alreadyFriends: boolean;
+}
+
+/**
+ * Accept a friend invitation by creating mutual friend records
+ */
+export const acceptFriendInvite: HttpsCallable<AcceptFriendInviteParams, AcceptFriendInviteResponse> =
+  httpsCallable(functions, 'acceptFriendInvite');
+
 export interface WritingModeSubmission {
   pageNumber: number;
   imageBase64: string;
@@ -155,3 +170,30 @@ export interface VerifyWrittenAnswersResponse {
  */
 export const verifyWrittenAnswers: HttpsCallable<VerifyWrittenAnswersParams, VerifyWrittenAnswersResponse> = 
   httpsCallable(functions, 'verifyWrittenAnswers');
+
+export interface ProblemResult {
+  id: number;
+  problem: string;
+  type: string;
+  is_correct: boolean;
+  confidence: number;
+  notes: string;
+}
+
+export interface GeneratePracticeFeedbackParams {
+  results: ProblemResult[];
+  totalProblems: number;
+  correctCount: number;
+}
+
+export interface GeneratePracticeFeedbackResponse {
+  feedback: string;
+  success: boolean;
+  error?: string;
+}
+
+/**
+ * Generate AI-powered feedback for practice sessions using GPT-4.1 mini
+ */
+export const generatePracticeFeedback: HttpsCallable<GeneratePracticeFeedbackParams, GeneratePracticeFeedbackResponse> = 
+  httpsCallable(functions, 'generatePracticeFeedback');

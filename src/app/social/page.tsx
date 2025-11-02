@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   collection,
   query,
@@ -8,13 +9,13 @@ import {
   limit,
   onSnapshot,
   doc,
-  setDoc,
   deleteDoc,
   where,
   getDocs,
-  Timestamp,
+  getDoc,
 } from "firebase/firestore";
 import { firestore } from "@/lib/firebase/client";
+import { acceptFriendInvite } from "@/lib/firebase/functions";
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
   Badge,
@@ -24,6 +25,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  Dialog,
 } from "@/components/ui";
 import { X, Copy, Check, Trophy, Users, Star } from "lucide-react";
 
@@ -55,6 +57,17 @@ export default function SocialPage() {
   const [showFullLeaderboard, setShowFullLeaderboard] = useState(false);
   const [inviteLink, setInviteLink] = useState("");
   const [copied, setCopied] = useState(false);
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [pendingInvite, setPendingInvite] = useState<{
+    uid: string;
+    displayName: string;
+    loading: boolean;
+  } | null>(null);
+  const [inviteActionError, setInviteActionError] = useState<string | null>(null);
+  const [isAcceptingInvite, setIsAcceptingInvite] = useState(false);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const inviteUidParam = searchParams.get("invite");
 
   // Generate invite link
   useEffect(() => {
@@ -137,20 +150,116 @@ export default function SocialPage() {
     return () => unsubscribe();
   }, [user]);
 
-  // Check for invite in URL
+  const addFriend = useCallback(async (friendUid: string) => {
+    if (!user) {
+      throw new Error("You need to be signed in to add friends.");
+    }
+
+    const { data } = await acceptFriendInvite({ inviterUid: friendUid });
+
+    if (!data?.success) {
+      throw new Error("Invitation failed to complete.");
+    }
+
+    if (data.alreadyFriends) {
+      console.debug("Friendship already exists", { friendUid });
+    }
+
+    return data;
+  }, [user]);
+
+  const clearInviteParam = useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("invite");
+    const query = params.toString();
+    router.replace(`/social${query ? `?${query}` : ""}`, { scroll: false });
+  }, [router, searchParams]);
+
   useEffect(() => {
     if (!user || !firestore) return;
 
-    const params = new URLSearchParams(window.location.search);
-    const inviteUid = params.get("invite");
-
-    if (inviteUid && inviteUid !== user.uid) {
-      // Add friend
-      addFriend(inviteUid);
-      // Clean up URL
-      window.history.replaceState({}, "", "/social");
+    if (!inviteUidParam) {
+      return;
     }
-  }, [user]);
+
+    if (inviteUidParam === user.uid) {
+      setPendingInvite({
+        uid: inviteUidParam,
+        displayName: user.displayName || "You",
+        loading: false,
+      });
+      setInviteActionError("You can't add yourself as a friend.");
+      setIsAcceptingInvite(false);
+      setInviteModalOpen(true);
+      return;
+    }
+
+    let cancelled = false;
+    setPendingInvite({ uid: inviteUidParam, displayName: "", loading: true });
+    setInviteActionError(null);
+    setIsAcceptingInvite(false);
+    setInviteModalOpen(true);
+
+    (async () => {
+      try {
+        const profileSnap = await getDoc(doc(firestore, "users", inviteUidParam));
+        if (cancelled) return;
+        if (profileSnap.exists()) {
+          const data = profileSnap.data() as { displayName?: string };
+          setPendingInvite({
+            uid: inviteUidParam,
+            displayName: data.displayName || "Anonymous",
+            loading: false,
+          });
+        } else {
+          setPendingInvite({
+            uid: inviteUidParam,
+            displayName: "Unknown player",
+            loading: false,
+          });
+          setInviteActionError("We couldn't find that player anymore.");
+        }
+      } catch (error) {
+        if (cancelled) return;
+        console.error("Failed to load invite profile:", error);
+        setPendingInvite({
+          uid: inviteUidParam,
+          displayName: "Unknown player",
+          loading: false,
+        });
+        setInviteActionError("Failed to load player info. Please try again later.");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user, firestore, inviteUidParam]);
+
+  const handleDismissInvite = useCallback(() => {
+    setInviteModalOpen(false);
+    setPendingInvite(null);
+    setInviteActionError(null);
+    setIsAcceptingInvite(false);
+    clearInviteParam();
+  }, [clearInviteParam]);
+
+  const handleAcceptInvite = useCallback(async () => {
+    if (!pendingInvite || pendingInvite.loading) return;
+
+    setIsAcceptingInvite(true);
+    setInviteActionError(null);
+    try {
+      await addFriend(pendingInvite.uid);
+      handleDismissInvite();
+    } catch (error) {
+      console.error("Failed to accept invite:", error);
+      const message =
+        error instanceof Error ? error.message : "Failed to add friend. Please try again.";
+      setInviteActionError(message);
+      setIsAcceptingInvite(false);
+    }
+  }, [pendingInvite, addFriend, handleDismissInvite]);
 
   const determineStatus = (userData: any): "online" | "in-match" | "offline" => {
     if (!userData.playerState) return "offline";
@@ -163,26 +272,6 @@ export default function SocialPage() {
     if (userData.playerState.status === "in-match") return "in-match";
     if (userData.playerState.status === "in-queue") return "online";
     return "online";
-  };
-
-  const addFriend = async (friendUid: string) => {
-    if (!user || !firestore) return;
-
-    try {
-      // Add to current user's friends
-      await setDoc(doc(firestore, `users/${user.uid}/friends/${friendUid}`), {
-        friendUid,
-        addedAt: Timestamp.now(),
-      });
-
-      // Add to friend's friends (mutual friendship)
-      await setDoc(doc(firestore, `users/${friendUid}/friends/${user.uid}`), {
-        friendUid: user.uid,
-        addedAt: Timestamp.now(),
-      });
-    } catch (error) {
-      console.error("Failed to add friend:", error);
-    }
   };
 
   const removeFriend = async (friendUid: string) => {
@@ -211,7 +300,81 @@ export default function SocialPage() {
   const userEntry = leaderboard.find((entry) => entry.uid === user?.uid);
 
   return (
-    <div className="space-y-8">
+    <>
+      <Dialog open={inviteModalOpen} onClose={handleDismissInvite} title="Add this player?">
+        {pendingInvite?.loading ? (
+          <div className="flex items-center gap-3 text-ink-soft">
+            <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" aria-hidden="true">
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+                fill="none"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              />
+            </svg>
+            <span>Fetching player details…</span>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-ink">
+              Do you want to add{" "}
+              <span className="font-semibold">
+                {pendingInvite?.displayName || "this player"}
+              </span>{" "}
+              to your friends list?
+            </p>
+            {inviteActionError && (
+              <p className="text-sm text-red-600">{inviteActionError}</p>
+            )}
+            <div className="flex justify-end gap-3 pt-2">
+              <Button
+                variant="subtle"
+                onClick={handleDismissInvite}
+                disabled={isAcceptingInvite}
+              >
+                Maybe later
+              </Button>
+              <Button
+                onClick={handleAcceptInvite}
+                disabled={isAcceptingInvite || pendingInvite?.loading}
+              >
+                {isAcceptingInvite ? (
+                  <>
+                    <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" aria-hidden="true">
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                        fill="none"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                    Adding…
+                  </>
+                ) : (
+                  "Add Friend"
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Dialog>
+      <div className="space-y-8">
       <header className="space-y-4">
         <Badge variant="blue">Community Hub</Badge>
         <h1 className="text-4xl font-bold">Connect, Compete, Conquer.</h1>
@@ -616,6 +779,7 @@ export default function SocialPage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }

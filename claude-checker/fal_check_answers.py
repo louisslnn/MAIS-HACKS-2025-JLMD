@@ -46,44 +46,38 @@ def verify_answers_with_vision(image_path: str, expected_problems: List[Dict]) -
     image_url = fal_client.upload_file(image_path)
     
     # Build the prompt with expected answers
-    expected_str = json.dumps(expected_problems, indent=2)
+    formatted_problems = "\n".join(
+        [
+            f"- Problem ID {item['id']} ({item['type']}): prompt = {item['problem']}, expected_answer = {item['answer']}"
+            for item in expected_problems
+        ]
+    )
     
     prompt = f"""You are checking math answers from this image. WORK QUICKLY AND EFFICIENTLY.
 
-Expected Problems and Answers:
-{expected_str}
+Expected Problems:
+{formatted_problems}
 
-For each problem in the expected list, analyze the image to determine:
-1. If the problem appears in the image
-2. If an answer is given in the image
-3. If that answer matches the expected answer
-4. Your confidence level in the verification (0.0 to 1.0)
+For each problem listed above, analyze the image to determine:
+1. If the student's written work contains that problem.
+2. Whether the student wrote an answer.
+3. Whether the student's answer matches the expected answer (accept mathematically equivalent forms).
+4. How confident you are in your judgment (0.0 to 1.0).
 
-CRITICAL: You MUST respond with ONLY a valid JSON object. No markdown, no code blocks, no explanatory text before or after. Your entire response must be parseable JSON.
-
-SPEED IS PARAMOUNT: Respond as quickly as possible with minimal tokens. Skip any verbose analysis.
-
-Required JSON structure (follow this EXACTLY):
-{{"results":[{{"id":1,"type":"addition","is_correct":true,"confidence":1.0,"notes":""}},{{"id":2,"type":"multiplication","is_correct":false,"confidence":0.95,"notes":"multiplication error"}}]}}
+CRITICAL: You MUST respond with ONLY a valid JSON object. No markdown, no code blocks, and no commentary outside the JSON. The JSON must follow this schema exactly:
+{{"results":[{{"id":1,"type":"addition","is_correct":true,"confidence":1.0,"notes":""}},{{"id":2,"type":"addition","is_correct":false,"confidence":0.75,"notes":"expected 10 got 12"}}]}}
 
 Rules:
-- "id" must be an integer matching the problem ID
-- "type" must be a string matching the problem type from the expected list (e.g., "addition", "multiplication", "integral")
-- "is_correct" must be boolean (true/false, lowercase, no quotes)
-- "confidence" must be a float between 0.0 and 1.0 (how certain you are about this verification)
-  - 1.0 = completely certain (problem clearly visible, answer obviously correct/incorrect)
-  - 0.9 = very confident (minor ambiguity in handwriting but answer is clear)
-  - 0.7-0.8 = moderately confident (some difficulty reading but likely correct assessment)
-  - 0.5-0.6 = low confidence (handwriting unclear or problem partially visible)
-  - 0.0-0.4 = very uncertain (problem not found or completely illegible)
-- "notes" must be a string (use "" for empty string if answer is correct)
-- Include ONLY error notes when is_correct is false
-- Include ALL problems from the expected list in order
-- Do NOT add any fields not specified above
-- Do NOT wrap response in ```json``` or any markdown
-- Do NOT add newlines, whitespace, or formatting - output compact JSON on a single line
-- Minimize token usage by keeping notes brief (state problem and error)
-- RESPOND AS FAST AS POSSIBLE - speed is more important than perfection
+- "id" must be the integer ID from the expected problem list.
+- "type" must match the string from the expected problem list (e.g., "addition", "integral").
+- "is_correct" must be true or false (lowercase).
+- "confidence" must be a float between 0.0 and 1.0. Use 0.0 if the answer is missing or unreadable.
+- "notes" must be a short string. Use "" if the answer is clearly correct. Provide brief explanations (e.g., "no answer provided", "expected 12 got 14") when marking incorrect or uncertain answers.
+- Include EVERY problem listed above in the same order.
+- Do NOT add fields beyond id, type, is_correct, confidence, notes.
+- Do NOT wrap the JSON in ```json``` or any other formatting.
+- Keep the JSON on a single line if possible.
+- Respond as quickly and concisely as possible.
 
 Start your response with {{"results":[ and end with ]}}"""
 

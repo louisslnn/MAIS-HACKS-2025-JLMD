@@ -6,7 +6,7 @@
   "license": "MIT",
   "main": "lib/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp src/lib/integrals.json lib/lib/integrals.json 2>/dev/null || true",
     "clean": "rimraf lib",
     "lint": "eslint \"src/**/*.ts\"",
     "serve": "npm run build && firebase emulators:start --only functions,firestore,database",
@@ -20,6 +20,7 @@
     "@fal-ai/serverless-client": "^0.15.0",
     "firebase-admin": "^12.6.0",
     "firebase-functions": "^5.1.0",
+    "openai": "^6.7.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {

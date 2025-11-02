@@ -82,8 +82,22 @@ ${expectedStr}
 For each problem in the expected list, analyze the image to determine:
 1. If the problem appears in the image
 2. If an answer is given in the image
-3. If that answer matches the expected answer
+3. If that answer matches the expected answer OR is mathematically equivalent
 4. Your confidence level in the verification (0.0 to 1.0)
+
+IMPORTANT - EQUIVALENT ANSWERS ARE CORRECT:
+- Fractions: Accept equivalent forms (e.g., 1/2 = 2/4 = 0.5 = 50%)
+- Decimals: Accept fraction equivalents (e.g., 0.5 = 1/2 = 5/10)
+- Simplified vs unsimplified: Accept both (e.g., 2/4 = 1/2, 4/2 = 2)
+- Different notations: Accept (e.g., 2x = 2*x, x² = x^2)
+- Constants: Accept (e.g., C = +C, +C = C)
+- For integrals: Accept any antiderivative form (e.g., x²/2 = x^2/2 = ½x²)
+- Negative signs: Accept equivalent placement (e.g., -1/2 = -0.5 = -2/4)
+- COEFFICIENT PLACEMENT (CRITICAL): Coefficient placement does NOT affect correctness. All these are EQUIVALENT and must be marked as CORRECT:
+  * Examples: x^3/3 = 1/3 x^3 = (1/3)x^3 = x^3/3 = (1/3)*x^3
+  * Examples: 2x^2 = 2*x^2 = x^2*2 = (2)x^2
+  * Examples: 5x = 5*x = x*5 = (5)x
+  * The order of coefficient and variable term does NOT matter: "coefficient placement differs" is NOT a valid reason to mark as incorrect
 
 CRITICAL: You MUST respond with ONLY a valid JSON object. No markdown, no code blocks, no explanatory text before or after. Your entire response must be parseable JSON.
 
@@ -97,8 +111,12 @@ Rules:
 - "type" must be a string matching the problem type from the expected list (e.g., "addition", "multiplication", "integral")
 - "is_correct" must be boolean (true/false, lowercase, no quotes)
   - CRITICAL: If notes contains "no answer provided", "answer box empty", "answer blank", or similar, is_correct MUST be false
-  - is_correct = true ONLY when an answer is clearly visible AND matches the expected answer
-  - is_correct = false if: no answer visible, answer box empty, answer doesn't match, or answer is unclear
+  - is_correct = true when an answer is clearly visible AND either:
+    * Matches the expected answer exactly, OR
+    * Is mathematically equivalent to the expected answer (see EQUIVALENT ANSWERS rules above)
+  - is_correct = false if: no answer visible, answer box empty, answer doesn't match AND isn't equivalent, or answer is unclear
+  - When answer is equivalent but different form, set is_correct = true and confidence >= 0.8
+  - NEVER mark as false due to coefficient placement differences (e.g., x^3/3 vs 1/3 x^3 are ALWAYS equivalent and both correct)
 - "confidence" must be a float between 0.0 and 1.0 (how certain you are about this verification)
   - 1.0 = completely certain (problem clearly visible, answer obviously correct/incorrect)
   - 0.9 = very confident (minor ambiguity in handwriting but answer is clear)
@@ -110,6 +128,7 @@ Rules:
   - Use "" for empty string if answer is correct and clearly visible
   - Include notes when: answer is incorrect, no answer provided, answer box empty, or answer unclear
   - Examples: "no answer provided", "answer box empty", "wrong answer", "expected 15 got 12"
+  - DO NOT mention coefficient placement differences in notes - if forms are equivalent, mark as correct with no note about placement
 - Include ONLY error notes when is_correct is false
 - Include ALL problems from the expected list in order
 - Do NOT add any fields not specified above

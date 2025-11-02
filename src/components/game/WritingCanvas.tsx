@@ -55,6 +55,11 @@ export const WritingCanvas = forwardRef<HTMLCanvasElement, WritingCanvasProps>(f
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    // Prevent default touch behavior (scrolling)
+    if ("touches" in e) {
+      e.preventDefault();
+    }
+
     setIsDrawing(true);
 
     const rect = canvas.getBoundingClientRect();
@@ -64,6 +69,7 @@ export const WritingCanvas = forwardRef<HTMLCanvasElement, WritingCanvasProps>(f
     const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
     const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
     
+    // Use pageX/pageY for more accurate positioning with scrolling
     const x = (clientX - rect.left) * scaleX;
     const y = (clientY - rect.top) * scaleY;
 
@@ -142,6 +148,7 @@ export const WritingCanvas = forwardRef<HTMLCanvasElement, WritingCanvasProps>(f
       <canvas
         ref={actualRef}
         className="border-2 border-border rounded-lg cursor-crosshair bg-white touch-none"
+        style={{ touchAction: 'none' }}
         onMouseDown={startDrawing}
         onMouseMove={draw}
         onMouseUp={stopDrawing}
@@ -149,6 +156,7 @@ export const WritingCanvas = forwardRef<HTMLCanvasElement, WritingCanvasProps>(f
         onTouchStart={startDrawing}
         onTouchMove={draw}
         onTouchEnd={stopDrawing}
+        onTouchCancel={stopDrawing}
       />
       
       <div className="flex items-center gap-3">

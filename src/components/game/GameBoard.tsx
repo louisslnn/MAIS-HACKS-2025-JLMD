@@ -9,7 +9,7 @@ import { RoundTimer } from "./RoundTimer";
 import { WritingCanvas } from "./WritingCanvas";
 import { LatexRenderer } from "./LatexRenderer";
 import { Button } from "@/components/ui";
-import { verifyWrittenAnswers } from "@/lib/firebase/functions";
+import { verifyWrittenAnswers, generatePracticeFeedback, type ProblemResult } from "@/lib/firebase/functions";
 import type { MatchDocument, RoundDocument, AnswerDocument } from "@/lib/game/types";
 
 interface GameBoardProps {
@@ -20,7 +20,7 @@ interface GameBoardProps {
 
 export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
   const { user } = useAuth();
-  const { opponentState, state, submitPracticeAnswer } = useMatch();
+  const { opponentState, state, submitPracticeAnswer, applyPracticeOcrResults } = useMatch();
   const currentUserId = user?.uid;
   
   const isWritingMode = match.settings.writingMode === true;
@@ -37,7 +37,9 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
   const [capturedScreenshots, setCapturedScreenshots] = useState<string[]>([]);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [isCapturing, setIsCapturing] = useState(false);
-  const [isProcessingOCR, setIsProcessingOCR] = useState(false);
+  const [isProcessingFinal, setIsProcessingFinal] = useState(false);
+  const [aiFeedback, setAiFeedback] = useState<string | null>(null);
+  const accumulatedResultsRef = useRef<Array<{ id: number; type: string; is_correct: boolean; confidence: number; notes: string }>>([]);
 
   const currentUserAnswer = useMemo(() => {
     if (!activeRound) return null;
@@ -77,6 +79,78 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
     return pageGroups;
   }, [isWritingMode, isIntegral, match.settings.rounds]);
 
+  // Helper function to process all accumulated OCR results and finalize match
+  const processFinalOCRResults = useCallback(async (
+    allResults: Array<{ id: number; type: string; is_correct: boolean; confidence: number; notes: string }>,
+    rounds: RoundDocument[]
+  ) => {
+    console.log("Processing all accumulated OCR results:", allResults.length, "total");
+    
+    // Process all results to update scores
+    allResults.forEach((result) => {
+      const roundId = String(result.id);
+      const round = rounds.find(r => r.id === roundId);
+      
+      if (round) {
+        // Get the expected answer
+        let answerValue: string;
+        if (round.canonical.type === "addition") {
+          const params = round.canonical.params as { a: number; b: number; answer: number };
+          answerValue = String(params.answer);
+        } else {
+          const params = round.canonical.params as { answer: string };
+          answerValue = params.answer || "";
+        }
+        
+        // Submit the answer with OCR-determined correctness
+        submitPracticeAnswer(round.id, answerValue, result.is_correct);
+      }
+    });
+    
+    // Generate AI feedback
+    try {
+      console.log("Generating AI feedback...");
+      const correctCount = allResults.filter(r => r.is_correct).length;
+      
+      // Build problem results with full problem text
+      const problemResults: ProblemResult[] = allResults.map((result) => {
+        const round = rounds.find(r => parseInt(r.id, 10) === result.id);
+        return {
+          id: result.id,
+          problem: round?.prompt || `Problem ${result.id}`,
+          type: result.type,
+          is_correct: result.is_correct,
+          confidence: result.confidence,
+          notes: result.notes,
+        };
+      });
+      
+      const feedbackResponse = await generatePracticeFeedback({
+        results: problemResults,
+        totalProblems: allResults.length,
+        correctCount: correctCount,
+      });
+      
+      if (feedbackResponse.data?.success && feedbackResponse.data.feedback) {
+        console.log("AI feedback generated:", feedbackResponse.data.feedback);
+        setAiFeedback(feedbackResponse.data.feedback);
+        // Store in localStorage for MatchResults to retrieve
+        try {
+          localStorage.setItem(`practice-feedback-${match.id}`, feedbackResponse.data.feedback);
+        } catch (error) {
+          console.error("Failed to store feedback in localStorage:", error);
+        }
+      } else {
+        console.error("Failed to generate AI feedback:", feedbackResponse.data?.error);
+      }
+    } catch (error) {
+      console.error("Error generating AI feedback:", error);
+    }
+    
+    // Clear accumulated results after processing
+    accumulatedResultsRef.current = [];
+  }, [submitPracticeAnswer]);
+
   const handleCaptureScreenshot = useCallback(async () => {
     if (!screenshotAreaRef.current) return;
     
@@ -105,8 +179,19 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
       const newScreenshots = [...capturedScreenshots, base64Image];
       setCapturedScreenshots(newScreenshots);
       
-      // Move to next page
-      if (pages && currentPageIndex < pages.length - 1) {
+      // Reset capturing state after successful screenshot
+      setIsCapturing(false);
+      
+      const submittedPageIndex = currentPageIndex;
+      const isFinalPage = !pages || currentPageIndex >= pages.length - 1;
+      
+      // For final page, set processing state to prevent multiple submissions
+      if (isFinalPage) {
+        setIsProcessingFinal(true);
+      }
+      
+      // Move to next page immediately (don't wait for OCR)
+      if (pages && !isFinalPage) {
         setCurrentPageIndex(prev => prev + 1);
         // Clear canvases for next page
         setTimeout(() => {
@@ -120,131 +205,93 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
             }
           });
         }, 100);
-      } else {
-        // All pages captured, trigger OCR processing
-        console.log("All pages captured, processing with OCR...", newScreenshots.length);
-        setIsProcessingOCR(true);
+      }
+      
+      // Process OCR in background (don't block UI)
+      if (match.mode === "solo" && state.rounds && pages) {
+        // Build submission for just this page
+        const problemsPerPage = isIntegral ? 1 : 3;
+        const pageRounds = pages[submittedPageIndex];
         
-        // Call real OCR processing
-        setTimeout(async () => {
-          console.log("Writing mode complete, processing with OCR...", newScreenshots.length);
+        // Get actual rounds from state
+        const actualPageRounds = pageRounds.map(placeholder => {
+          const roundNum = parseInt(placeholder.id, 10);
+          return state.rounds.find(r => parseInt(r.id, 10) === roundNum);
+        }).filter(Boolean) as RoundDocument[];
+        
+        const expectedAnswers = actualPageRounds.map((round) => {
+          let expectedAnswer: string;
+          let problemType: string;
           
-          if (match.mode === "solo" && state.rounds && newScreenshots.length > 0) {
-            try {
-              // Build submissions for OCR - group problems by page
-              const submissions: Array<{
-                pageNumber: number;
-                imageBase64: string;
-                problemIds: string[];
-                expectedAnswers: Array<{ id: string; answer: string; type: string }>;
-              }> = [];
-              
-              // Group rounds into pages (same logic as pages array)
-              const problemsPerPage = isIntegral ? 1 : 3;
-              let pageIndex = 0;
-              
-              for (let i = 0; i < state.rounds.length; i += problemsPerPage) {
-                const pageRounds = state.rounds.slice(i, i + problemsPerPage);
-                const expectedAnswers = pageRounds.map((round) => {
-                  let expectedAnswer: string;
-                  let problemType: string;
-                  
-                  if (round.canonical.type === "addition") {
-                    const params = round.canonical.params as { a: number; b: number; answer: number };
-                    expectedAnswer = String(params.answer);
-                    problemType = "addition";
-                  } else if (round.canonical.type === "integral") {
-                    const params = round.canonical.params as { answer: string };
-                    expectedAnswer = params.answer || "";
-                    problemType = "integral";
-                  } else {
-                    expectedAnswer = "";
-                    problemType = "unknown";
-                  }
-                  
-                  // Use numeric ID for OCR (round.id is "1", "2", etc.)
-                  return {
-                    id: String(parseInt(round.id, 10) || round.id),
-                    answer: expectedAnswer,
-                    type: problemType,
-                  };
-                });
-                
-                if (pageIndex < newScreenshots.length) {
-                  submissions.push({
-                    pageNumber: pageIndex + 1,
-                    imageBase64: newScreenshots[pageIndex],
-                    problemIds: pageRounds.map(r => r.id),
-                    expectedAnswers,
-                  });
-                }
-                
-                pageIndex++;
-              }
-              
-              // Call the OCR Cloud Function
-              console.log("Calling verifyWrittenAnswers with", submissions.length, "submissions");
-              const ocrResult = await verifyWrittenAnswers({ submissions });
-              
-              if (!ocrResult.data || !ocrResult.data.success) {
-                throw new Error(ocrResult.data?.error || "OCR processing failed");
-              }
-              
-              console.log("OCR Results:", ocrResult.data.results);
-              
-              // Parse OCR results and update scores
-              let correctCount = 0;
-              const totalRounds = state.rounds.length;
-              
-              // Map OCR results to rounds and submit answers with OCR correctness
-              // OCR returns results in order with numeric IDs matching the expectedAnswers IDs
-              ocrResult.data.results.forEach((result) => {
-                // Find the round by matching the numeric ID
-                const roundId = String(result.id);
-                const round = state.rounds.find(r => r.id === roundId);
-                
-                if (round) {
-                  // Get the expected answer (for display purposes)
-                  let answerValue: string;
-                  if (round.canonical.type === "addition") {
-                    const params = round.canonical.params as { a: number; b: number; answer: number };
-                    answerValue = String(params.answer);
-                  } else {
-                    const params = round.canonical.params as { answer: string };
-                    answerValue = params.answer || "";
-                  }
-                  
-                  // Submit the answer with OCR-determined correctness
-                  submitPracticeAnswer(round.id, answerValue, result.is_correct);
-                  
-                  if (result.is_correct) {
-                    correctCount++;
-                  }
-                }
-              });
-              
-              // After all answers are submitted, the state should update automatically
-              // The submitPracticeAnswer function will mark match as completed when all rounds are locked
-              setIsProcessingOCR(false);
-              
-            } catch (error) {
-              console.error("OCR processing error:", error);
-              setIsProcessingOCR(false);
-              
-              // Fallback: show error message
+          if (round.canonical.type === "addition") {
+            const params = round.canonical.params as { a: number; b: number; answer: number };
+            expectedAnswer = String(params.answer);
+            problemType = "addition";
+          } else if (round.canonical.type === "integral") {
+            const params = round.canonical.params as { answer: string };
+            expectedAnswer = params.answer || "";
+            problemType = "integral";
+          } else {
+            expectedAnswer = "";
+            problemType = "unknown";
+          }
+          
+          return {
+            id: String(parseInt(round.id, 10) || round.id),
+            answer: expectedAnswer,
+            type: problemType,
+          };
+        });
+        
+        const submission = {
+          pageNumber: submittedPageIndex + 1,
+          imageBase64: base64Image,
+          problemIds: actualPageRounds.map(r => r.id),
+          expectedAnswers,
+        };
+        
+        // Process OCR asynchronously in background (no UI blocking)
+        verifyWrittenAnswers({ submissions: [submission] })
+          .then((ocrResult) => {
+            if (!ocrResult.data || !ocrResult.data.success) {
+              throw new Error(ocrResult.data?.error || "OCR processing failed");
+            }
+            
+            console.log(`OCR Results for page ${submittedPageIndex + 1}:`, ocrResult.data.results);
+            
+            // Accumulate results
+            accumulatedResultsRef.current = [...accumulatedResultsRef.current, ...ocrResult.data.results];
+
+            if (isFinalPage) {
+              const aggregated = [...accumulatedResultsRef.current];
+              accumulatedResultsRef.current = [];
+              setTimeout(() => {
+                processFinalOCRResults(aggregated, state.rounds || []);
+                setIsProcessingFinal(false);
+              }, 100);
+            }
+          })
+          .catch((error) => {
+            console.error(`OCR processing error for page ${submittedPageIndex + 1}:`, error);
+            // Only show error alert on final page, silently log for others
+            if (isFinalPage) {
+              setIsProcessingFinal(false); // Reset on error so user can retry
               alert(`OCR Processing Error: ${error instanceof Error ? error.message : "Unknown error"}\n\nPlease try again.`);
             }
-          } else {
-            setIsProcessingOCR(false);
-          }
-        }, 1000);
+          })
+          .finally(() => {
+            if (isFinalPage && accumulatedResultsRef.current.length === 0) {
+              // Ensure pending state clears even if results array was empty
+              setIsProcessingFinal(false);
+            }
+          });
       }
     } catch (error) {
       console.error("Screenshot capture failed:", error);
-    } finally {
       setIsCapturing(false);
+      setIsProcessingFinal(false); // Reset processing state on error
     }
-  }, [pages, currentPageIndex, capturedScreenshots]);
+  }, [pages, currentPageIndex, capturedScreenshots, state.rounds, match.mode, isIntegral, submitPracticeAnswer, processFinalOCRResults]);
 
   const roundLocked = activeRound?.status === "locked";
   const roundExpired = activeRound?.endsAt 
@@ -273,18 +320,9 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
           <div className="inline-block px-4 py-2 rounded-full bg-brand/10 text-brand text-sm font-medium">
             📝 Writing Mode - Page {currentPageIndex + 1} of {totalPages}
           </div>
-          {capturedScreenshots.length > 0 && !isProcessingOCR && (
+          {capturedScreenshots.length > 0 && (
             <div className="text-sm text-ink-soft">
               {capturedScreenshots.length} page(s) submitted
-            </div>
-          )}
-          {isProcessingOCR && (
-            <div className="flex items-center gap-2 text-sm text-brand font-medium">
-              <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              Processing with AI...
             </div>
           )}
         </div>
@@ -347,47 +385,36 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
         </div>
 
         {/* Submit Page Button */}
-        {!isProcessingOCR ? (
-          <div className="flex justify-center">
-            <Button
-              size="lg"
-              onClick={handleCaptureScreenshot}
-              disabled={isCapturing}
-              className="px-8"
-            >
-              {isCapturing ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Capturing...
-                </>
-              ) : currentPageIndex === totalPages - 1 ? (
-                `Submit Final Page & Process`
-              ) : (
-                `Submit Page ${currentPageIndex + 1} of ${totalPages}`
-              )}
-            </Button>
-          </div>
-        ) : (
-          <div className="rounded-2xl bg-brand/5 border border-brand/20 p-8 text-center">
-            <div className="flex flex-col items-center gap-4">
-              <svg className="animate-spin h-12 w-12 text-brand" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              <div>
-                <h3 className="text-xl font-semibold text-ink mb-2">
-                  🤖 AI is checking your answers...
-                </h3>
-                <p className="text-sm text-ink-soft">
-                  Using Claude Sonnet 4.5 to verify your handwritten solutions
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
+        <div className="flex justify-center">
+          <Button
+            size="lg"
+            onClick={handleCaptureScreenshot}
+            disabled={isCapturing || isProcessingFinal}
+            className="px-8"
+          >
+            {isCapturing ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Capturing...
+              </>
+            ) : isProcessingFinal ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Processing Results...
+              </>
+            ) : currentPageIndex === totalPages - 1 ? (
+              `Submit Final Page & Process`
+            ) : (
+              `Submit Page ${currentPageIndex + 1} of ${totalPages}`
+            )}
+          </Button>
+        </div>
       </div>
     );
   }

@@ -54,6 +54,13 @@ interface MatchContextValue {
   cancelMatchmaking: () => Promise<void>;
   opponentState: OpponentState | null;
   submitPracticeAnswer: (roundId: string, value: string | number, isCorrect?: boolean) => void;
+  applyPracticeOcrResults: (rounds: Array<{
+    roundId: string;
+    expectedAnswer: string;
+    isCorrect: boolean;
+    confidence: number;
+    notes: string;
+  }>) => void;
   quitMatch: () => Promise<void>;
 }
 
@@ -546,6 +553,68 @@ export function MatchProvider({ children }: { children: React.ReactNode }) {
     });
   }, [state.match]);
 
+  const applyPracticeOcrResults = useCallback((roundsEvaluated: Array<{
+    roundId: string;
+    expectedAnswer: string;
+    isCorrect: boolean;
+    confidence: number;
+    notes: string;
+  }>) => {
+    setState((prev) => {
+      if (!prev.match || !prev.match.id.startsWith("practice-")) return prev;
+      const playerId = prev.match.playerIds[0];
+      const player = prev.match.players[playerId];
+      if (!player) return prev;
+
+      const nowIso = new Date().toISOString();
+      const newAnswers: Record<string, AnswerDocument[]> = { ...prev.answers };
+
+      roundsEvaluated.forEach((result) => {
+        newAnswers[result.roundId] = [
+          {
+            uid: playerId,
+            value: result.expectedAnswer,
+            submittedAt: nowIso,
+            timeMs: 0,
+            correct: result.isCorrect,
+            judgedAt: nowIso,
+            ocrConfidence: result.confidence,
+            ocrNotes: result.notes,
+          },
+        ];
+      });
+
+      const correctCount = roundsEvaluated.filter((r) => r.isCorrect).length;
+      const updatedPlayer = {
+        ...player,
+        correctCount,
+        score: correctCount * 10,
+      };
+
+      const updatedMatch: MatchDocument = {
+        ...prev.match,
+        players: {
+          ...prev.match.players,
+          [playerId]: updatedPlayer,
+        },
+      };
+
+      const updatedRounds = prev.rounds.map((round) => {
+        if (roundsEvaluated.some((r) => r.roundId === round.id)) {
+          return { ...round, status: "locked" as const };
+        }
+        return round;
+      });
+
+      return {
+        ...prev,
+        match: updatedMatch,
+        rounds: updatedRounds,
+        answers: newAnswers,
+      };
+    });
+  }, []);
+
   const quitMatch = useCallback(async () => {
     if (!state.match || !user) return;
 
@@ -593,9 +662,22 @@ export function MatchProvider({ children }: { children: React.ReactNode }) {
       cancelMatchmaking,
       opponentState,
       submitPracticeAnswer,
+      applyPracticeOcrResults,
       quitMatch,
     }),
-    [state, setActiveMatchId, startLocalMatch, requestMatch, matchmakingStatus, matchmakingError, cancelMatchmaking, opponentState, submitPracticeAnswer, quitMatch],
+    [
+      state,
+      setActiveMatchId,
+      startLocalMatch,
+      requestMatch,
+      matchmakingStatus,
+      matchmakingError,
+      cancelMatchmaking,
+      opponentState,
+      submitPracticeAnswer,
+      applyPracticeOcrResults,
+      quitMatch,
+    ],
   );
 
   return <MatchContext.Provider value={value}>{children}</MatchContext.Provider>;

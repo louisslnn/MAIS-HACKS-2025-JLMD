@@ -7,3 +7,5 @@ export { forfeitMatch } from "./forfeit";
 export { cleanupOldMatches, resetAllRatings } from "./admin";
 export { backfillUserDocuments } from "./backfill";
 export { verifyWrittenAnswers } from "./ocr";
+export { generatePracticeFeedback } from "./practiceFeedback";
+export { acceptFriendInvite } from "./friends";

@@ -10,6 +10,7 @@ interface MatchResultsProps {
   match: MatchDocument;
   userId: string;
   onPlayAgain: () => void;
+  aiFeedback?: string | null;
 }
 
 interface RatingChange {
@@ -18,9 +19,10 @@ interface RatingChange {
   delta: number;
 }
 
-export function MatchResults({ match, userId, onPlayAgain }: MatchResultsProps) {
+export function MatchResults({ match, userId, onPlayAgain, aiFeedback }: MatchResultsProps) {
   const [ratingChange, setRatingChange] = useState<RatingChange | null>(null);
   const [loading, setLoading] = useState(true);
+  const [storedFeedback, setStoredFeedback] = useState<string | null>(null);
 
   useEffect(() => {
     if (!userId) return;
@@ -58,6 +60,22 @@ export function MatchResults({ match, userId, onPlayAgain }: MatchResultsProps) 
     setRatingChange(null);
     setLoading(true);
   }, [match, userId]);
+
+  // Load AI feedback from localStorage for practice mode
+  useEffect(() => {
+    if (match.mode === "solo" && match.id) {
+      try {
+        const feedback = localStorage.getItem(`practice-feedback-${match.id}`);
+        if (feedback) {
+          setStoredFeedback(feedback);
+          // Clean up after reading
+          localStorage.removeItem(`practice-feedback-${match.id}`);
+        }
+      } catch (error) {
+        console.error("Failed to retrieve feedback from localStorage:", error);
+      }
+    }
+  }, [match.mode, match.id]);
 
   // For solo/practice mode, use the first player ID if userId doesn't match
   const isSolo = match.mode === "solo";
@@ -149,7 +167,7 @@ export function MatchResults({ match, userId, onPlayAgain }: MatchResultsProps) 
         )}
         
         {loading && (
-          <p className="mt-4 text-sm text-ink-soft">Calculating rating change...</p>
+          <p className="mt-4 text-sm text-ink-soft"></p>
         )}
         {!loading && ratingChange && !isSolo && (
           <div className="mt-4">
@@ -165,6 +183,21 @@ export function MatchResults({ match, userId, onPlayAgain }: MatchResultsProps) 
           </div>
         )}
       </div>
+
+      {/* AI Feedback for Practice Mode */}
+      {isSolo && (aiFeedback || storedFeedback) && (
+        <div className="rounded-xl border border-brand/20 bg-gradient-to-br from-brand/5 to-purple-50 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <svg className="w-6 h-6 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            </svg>
+            <h3 className="text-lg font-semibold text-ink">AI Tutor Feedback</h3>
+          </div>
+          <div className="text-ink-soft leading-relaxed whitespace-pre-line">
+            {aiFeedback || storedFeedback}
+          </div>
+        </div>
+      )}
 
       {/* Match Statistics */}
       <div className={`grid gap-4 ${isSolo ? 'md:grid-cols-1' : 'md:grid-cols-2'}`}>
