@@ -131,17 +131,21 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
         correctCount: correctCount,
       });
       
+      console.log("[GameBoard] Feedback response:", feedbackResponse);
       if (feedbackResponse.data?.success && feedbackResponse.data.feedback) {
-        console.log("AI feedback generated:", feedbackResponse.data.feedback);
+        console.log("[GameBoard] AI feedback generated successfully:", feedbackResponse.data.feedback);
         setAiFeedback(feedbackResponse.data.feedback);
         // Store in localStorage for MatchResults to retrieve
         try {
-          localStorage.setItem(`practice-feedback-${match.id}`, feedbackResponse.data.feedback);
+          const storageKey = `practice-feedback-${match.id}`;
+          console.log("[GameBoard] Storing feedback with key:", storageKey);
+          localStorage.setItem(storageKey, feedbackResponse.data.feedback);
+          console.log("[GameBoard] Feedback stored successfully");
         } catch (error) {
-          console.error("Failed to store feedback in localStorage:", error);
+          console.error("[GameBoard] Failed to store feedback in localStorage:", error);
         }
       } else {
-        console.error("Failed to generate AI feedback:", feedbackResponse.data?.error);
+        console.error("[GameBoard] Failed to generate AI feedback:", feedbackResponse.data?.error);
       }
     } catch (error) {
       console.error("Error generating AI feedback:", error);
