@@ -84,6 +84,21 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
       const canvas = await html2canvas(screenshotAreaRef.current, {
         backgroundColor: "#ffffff",
         scale: 2,
+        logging: false,
+        useCORS: true,
+        allowTaint: true,
+        // Ignore unsupported CSS properties
+        ignoreElements: (element) => {
+          // Skip elements that might have problematic colors
+          return false;
+        },
+        onclone: (clonedDoc) => {
+          // Override any oklab colors with simple ones
+          const clonedElement = clonedDoc.querySelector('[data-screenshot-area]');
+          if (clonedElement) {
+            clonedElement.setAttribute('style', 'background: #ffffff; color: #000000;');
+          }
+        },
       });
       const base64Image = canvas.toDataURL("image/png");
       const newScreenshots = [...capturedScreenshots, base64Image];
@@ -160,7 +175,13 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
         {/* Screenshot Area */}
         <div 
           ref={screenshotAreaRef}
-          className="rounded-2xl bg-white p-8 border-2 border-brand/20"
+          data-screenshot-area
+          className="rounded-2xl p-8 border-2"
+          style={{ 
+            backgroundColor: '#ffffff',
+            borderColor: '#e5e7eb',
+            color: '#000000'
+          }}
         >
           {/* Problems */}
           <div className="space-y-8">
@@ -177,13 +198,13 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
               return (
                 <div key={roundNum} className="space-y-4">
                   <div className="flex items-center gap-3 mb-2">
-                    <span className="inline-block px-3 py-1 rounded-full bg-brand/10 text-brand text-xs font-medium">
+                    <span className="inline-block px-3 py-1 rounded-full text-xs font-medium" style={{ backgroundColor: '#dbeafe', color: '#1e40af' }}>
                       Problem {roundNum}
                     </span>
                   </div>
                   
                   {/* Problem Display */}
-                  <div className="text-3xl font-bold text-ink mb-4">
+                  <div className="text-3xl font-bold mb-4" style={{ color: '#000000' }}>
                     {isIntegralProblem ? (
                       <LatexRenderer content={actualRound.prompt} className="text-3xl" />
                     ) : (
@@ -193,7 +214,7 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
 
                   {/* Writing Canvas */}
                   <div>
-                    <label className="block text-sm font-medium text-ink-soft mb-2">
+                    <label className="block text-sm font-medium mb-2" style={{ color: '#6b7280' }}>
                       Write your answer:
                     </label>
                     <WritingCanvas
