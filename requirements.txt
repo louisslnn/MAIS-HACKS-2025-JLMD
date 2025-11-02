@@ -1,4 +1,0 @@
-flask==3.0.0
-flask-cors==4.0.0
-sympy==1.12
-antlr4-python3-runtime==4.9.3
