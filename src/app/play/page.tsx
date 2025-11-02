@@ -43,6 +43,7 @@ export default function PlayPage() {
   const { user, loading } = useAuth();
   const [selected, setSelected] = useState<ModeOption>("ranked");
   const [problemCategory, setProblemCategory] = useState<ProblemCategory>("addition");
+  const [writingMode, setWritingMode] = useState<boolean>(false);
   const { state, startLocalMatch, requestMatch, matchmakingStatus, matchmakingError, cancelMatchmaking, quitMatch } = useMatch();
 
   const handlePlay = async () => {
@@ -53,7 +54,7 @@ export default function PlayPage() {
     if (selected === "ranked") {
       await requestMatch(problemCategory);
     } else {
-      startLocalMatch("solo");
+      startLocalMatch("solo", { writingMode, problemCategory });
     }
   };
 
@@ -218,8 +219,8 @@ export default function PlayPage() {
             })}
           </div>
 
-          {/* Problem Category Selection (only for ranked) */}
-          {selected === "ranked" && (
+          {/* Problem Category Selection */}
+          {(selected === "ranked" || selected === "practice") && (
             <div className="mb-8 p-6 rounded-2xl bg-surface border border-border">
               <h3 className="text-lg font-semibold text-ink mb-4">Choose Problem Type</h3>
               <div className="grid grid-cols-2 gap-4">
@@ -243,6 +244,44 @@ export default function PlayPage() {
                   );
                 })}
               </div>
+            </div>
+          )}
+
+          {/* Writing Mode Toggle (only for practice) */}
+          {selected === "practice" && (
+            <div className="mb-8 p-6 rounded-2xl bg-surface border border-border">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-ink mb-1">📝 Writing Mode</h3>
+                  <p className="text-sm text-ink-soft">
+                    Write your answers by hand and we&apos;ll use AI to check them
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setWritingMode(!writingMode)}
+                  className={cn(
+                    "relative inline-flex h-8 w-14 items-center rounded-full transition-colors",
+                    writingMode ? "bg-brand" : "bg-gray-300"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "inline-block h-6 w-6 transform rounded-full bg-white transition-transform",
+                      writingMode ? "translate-x-7" : "translate-x-1"
+                    )}
+                  />
+                </button>
+              </div>
+              {writingMode && (
+                <div className="mt-4 p-3 rounded-lg bg-blue-50 border border-blue-200">
+                  <p className="text-sm text-blue-900">
+                    {problemCategory === "addition" 
+                      ? "You'll solve 15 addition problems (5 pages of 3 each)"
+                      : "You'll solve 3 integral problems (1 per page)"}
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

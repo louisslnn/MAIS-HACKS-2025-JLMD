@@ -1,10 +1,15 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef, useState, useCallback } from "react";
+import html2canvas from "html2canvas";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useMatch } from "@/contexts/match-context";
 import { AnswerInput } from "./AnswerInput";
 import { RoundTimer } from "./RoundTimer";
+import { WritingCanvas } from "./WritingCanvas";
+import { LatexRenderer } from "./LatexRenderer";
+import { Button } from "@/components/ui";
+import { verifyWrittenAnswers } from "@/lib/firebase/functions";
 import type { MatchDocument, RoundDocument, AnswerDocument } from "@/lib/game/types";
 
 interface GameBoardProps {
@@ -15,13 +20,27 @@ interface GameBoardProps {
 
 export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
   const { user } = useAuth();
-  const { opponentState } = useMatch();
+  const { opponentState, state } = useMatch();
   const currentUserId = user?.uid;
+  
+  const isWritingMode = match.settings.writingMode === true;
+  const problemCategory = match.settings.problemCategory || "addition";
+  const isIntegral = problemCategory === "integrals";
+  
+  // Refs for canvases and screenshot area
+  const canvas1Ref = useRef<HTMLCanvasElement>(null);
+  const canvas2Ref = useRef<HTMLCanvasElement>(null);
+  const canvas3Ref = useRef<HTMLCanvasElement>(null);
+  const screenshotAreaRef = useRef<HTMLDivElement>(null);
+  
+  // State for writing mode
+  const [capturedScreenshots, setCapturedScreenshots] = useState<string[]>([]);
+  const [currentPageIndex, setCurrentPageIndex] = useState(0);
+  const [isCapturing, setIsCapturing] = useState(false);
 
   const currentUserAnswer = useMemo(() => {
     if (!activeRound) return null;
     const roundAnswers = answers[activeRound.id] || [];
-    // For practice mode, use solo player ID; for real matches, use current user ID
     const searchId = match.mode === "solo" ? match.playerIds[0] : currentUserId;
     if (!searchId) return null;
     return roundAnswers.find((a) => a.uid === searchId) || null;
@@ -38,10 +57,73 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
     return roundAnswers.find((a) => a.uid === opponentId) || null;
   }, [activeRound, opponentId, answers]);
 
-  const isIntegral = activeRound?.canonical?.type === "integral";
+  // Group rounds into pages for writing mode
+  const pages = useMemo(() => {
+    if (!isWritingMode) return null;
+    
+    const problemsPerPage = isIntegral ? 1 : 3;
+    const totalProblems = isIntegral ? 3 : 15;
+    const rounds = match.settings.rounds || totalProblems;
+    
+    const pageGroups: RoundDocument[][] = [];
+    for (let i = 0; i < rounds; i += problemsPerPage) {
+      pageGroups.push(
+        Array.from({ length: problemsPerPage }, (_, j) => i + j + 1)
+          .filter(roundNum => roundNum <= rounds)
+          .map(roundNum => ({ id: String(roundNum) }) as RoundDocument)
+      );
+    }
+    return pageGroups;
+  }, [isWritingMode, isIntegral, match.settings.rounds]);
+
+  const handleCaptureScreenshot = useCallback(async () => {
+    if (!screenshotAreaRef.current) return;
+    
+    setIsCapturing(true);
+    try {
+      const canvas = await html2canvas(screenshotAreaRef.current, {
+        backgroundColor: "#ffffff",
+        scale: 2,
+      });
+      const base64Image = canvas.toDataURL("image/png");
+      const newScreenshots = [...capturedScreenshots, base64Image];
+      setCapturedScreenshots(newScreenshots);
+      
+      // Move to next page
+      if (pages && currentPageIndex < pages.length - 1) {
+        setCurrentPageIndex(prev => prev + 1);
+        // Clear canvases for next page
+        setTimeout(() => {
+          [canvas1Ref, canvas2Ref, canvas3Ref].forEach(ref => {
+            if (ref.current) {
+              const ctx = ref.current.getContext("2d");
+              if (ctx) {
+                ctx.fillStyle = "#ffffff";
+                ctx.fillRect(0, 0, ref.current.width, ref.current.height);
+              }
+            }
+          });
+        }, 100);
+      } else {
+        // All pages captured, trigger OCR processing
+        console.log("All pages captured, processing with OCR...", newScreenshots.length);
+        
+        // Build submissions for OCR
+        // TODO: Extract actual problem data and expected answers from rounds
+        // For now, this is a placeholder that needs to be integrated with the match context
+        
+        // Mark match as completed (this will trigger the MatchResults view)
+        // The actual OCR processing will happen there
+        console.log("Writing mode complete, all screenshots captured");
+      }
+    } catch (error) {
+      console.error("Screenshot capture failed:", error);
+    } finally {
+      setIsCapturing(false);
+    }
+  }, [pages, currentPageIndex, capturedScreenshots]);
+
   const roundLocked = activeRound?.status === "locked";
-  
-  // Check if round has expired (even if status isn't locked yet)
   const roundExpired = activeRound?.endsAt 
     ? new Date(activeRound.endsAt).getTime() <= Date.now()
     : false;
@@ -55,6 +137,105 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
     );
   }
 
+  // Render writing mode interface
+  if (isWritingMode && pages) {
+    const currentPage = pages[currentPageIndex];
+    const totalPages = pages.length;
+    const problemsOnPage = currentPage.length;
+
+    return (
+      <div className="space-y-8">
+        {/* Page Header */}
+        <div className="flex items-center justify-between">
+          <div className="inline-block px-4 py-2 rounded-full bg-brand/10 text-brand text-sm font-medium">
+            📝 Writing Mode - Page {currentPageIndex + 1} of {totalPages}
+          </div>
+          {capturedScreenshots.length > 0 && (
+            <div className="text-sm text-ink-soft">
+              {capturedScreenshots.length} page(s) submitted
+            </div>
+          )}
+        </div>
+
+        {/* Screenshot Area */}
+        <div 
+          ref={screenshotAreaRef}
+          className="rounded-2xl bg-white p-8 border-2 border-brand/20"
+        >
+          {/* Problems */}
+          <div className="space-y-8">
+            {currentPage.map((roundPlaceholder, idx) => {
+              const roundNum = parseInt(roundPlaceholder.id);
+              // Get the actual round from state.rounds
+              const actualRound = state.rounds.find(r => r.id === String(roundNum));
+              
+              if (!actualRound) return null;
+              
+              // For integrals, use LaTeX; for addition, show arithmetic
+              const isIntegralProblem = isIntegral;
+              
+              return (
+                <div key={roundNum} className="space-y-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="inline-block px-3 py-1 rounded-full bg-brand/10 text-brand text-xs font-medium">
+                      Problem {roundNum}
+                    </span>
+                  </div>
+                  
+                  {/* Problem Display */}
+                  <div className="text-3xl font-bold text-ink mb-4">
+                    {isIntegralProblem ? (
+                      <LatexRenderer content={actualRound.prompt} className="text-3xl" />
+                    ) : (
+                      <span className="font-mono">{actualRound.prompt}</span>
+                    )}
+                  </div>
+
+                  {/* Writing Canvas */}
+                  <div>
+                    <label className="block text-sm font-medium text-ink-soft mb-2">
+                      Write your answer:
+                    </label>
+                    <WritingCanvas
+                      ref={idx === 0 ? canvas1Ref : idx === 1 ? canvas2Ref : canvas3Ref}
+                      width={600}
+                      height={120}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Submit Page Button */}
+        <div className="flex justify-center">
+          <Button
+            size="lg"
+            onClick={handleCaptureScreenshot}
+            disabled={isCapturing}
+            className="px-8"
+          >
+            {isCapturing ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Capturing...
+              </>
+            ) : currentPageIndex === totalPages - 1 ? (
+              `Submit Final Page & Process`
+            ) : (
+              `Submit Page ${currentPageIndex + 1} of ${totalPages}`
+            )}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Standard typing mode interface (original code)
   return (
     <div className="space-y-8">
       {/* Question Card */}
@@ -70,7 +251,11 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
         </div>
         
         <div className="text-4xl sm:text-5xl font-bold text-ink mb-8 font-mono">
-          {activeRound.prompt}
+          {isIntegral ? (
+            <LatexRenderer content={activeRound.prompt} block className="text-4xl" />
+          ) : (
+            activeRound.prompt
+          )}
         </div>
 
         {/* Answer Input */}
@@ -191,4 +376,3 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
     </div>
   );
 }
-

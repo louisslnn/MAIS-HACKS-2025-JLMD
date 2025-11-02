@@ -47,7 +47,7 @@ interface OpponentState {
 interface MatchContextValue {
   state: MatchState;
   setActiveMatchId: (matchId: string | null) => void;
-  startLocalMatch: (mode: MatchMode) => void;
+  startLocalMatch: (mode: MatchMode, options?: { writingMode?: boolean; problemCategory?: "addition" | "integrals" }) => void;
   requestMatch: (category?: "addition" | "integrals") => Promise<void>;
   matchmakingStatus: MatchmakingStatus;
   matchmakingError: string | null;
@@ -295,7 +295,7 @@ export function MatchProvider({ children }: { children: React.ReactNode }) {
     }));
   }, []);
 
-  const startLocalMatch = useCallback((mode: MatchMode) => {
+  const startLocalMatch = useCallback((mode: MatchMode, options?: { writingMode?: boolean; problemCategory?: "addition" | "integrals" }) => {
     // For practice mode, create a local mock match
     setActiveMatchIdState(null);
     matchmakingStatusRef.current = "idle";
@@ -303,7 +303,7 @@ export function MatchProvider({ children }: { children: React.ReactNode }) {
     setMatchmakingError(null);
     
     if (mode === "solo") {
-      setState(createMockState(mode));
+      setState(createMockState(mode, options));
     } else {
       // Clear state for ranked (will be set by real match)
       setState({

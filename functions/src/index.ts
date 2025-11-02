@@ -6,3 +6,4 @@ export { getGameFeedback } from "./feedback";
 export { forfeitMatch } from "./forfeit";
 export { cleanupOldMatches, resetAllRatings } from "./admin";
 export { backfillUserDocuments } from "./backfill";
+export { verifyWrittenAnswers } from "./ocr";

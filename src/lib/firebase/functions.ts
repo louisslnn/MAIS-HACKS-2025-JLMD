@@ -124,3 +124,34 @@ export interface BackfillUserDocumentsResponse {
  */
 export const backfillUserDocuments: HttpsCallable<{}, BackfillUserDocumentsResponse> = 
   httpsCallable(functions, 'backfillUserDocuments');
+
+export interface WritingModeSubmission {
+  pageNumber: number;
+  imageBase64: string;
+  problemIds: string[];
+  expectedAnswers: Array<{ id: string; answer: string; type: string }>;
+}
+
+export interface OCRVerificationResult {
+  id: number;
+  type: string;
+  is_correct: boolean;
+  confidence: number;
+  notes: string;
+}
+
+export interface VerifyWrittenAnswersParams {
+  submissions: WritingModeSubmission[];
+}
+
+export interface VerifyWrittenAnswersResponse {
+  results: OCRVerificationResult[];
+  success: boolean;
+  error?: string;
+}
+
+/**
+ * Verify handwritten answers using OCR (Claude Sonnet 4.5 vision)
+ */
+export const verifyWrittenAnswers: HttpsCallable<VerifyWrittenAnswersParams, VerifyWrittenAnswersResponse> = 
+  httpsCallable(functions, 'verifyWrittenAnswers');

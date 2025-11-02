@@ -89,34 +89,56 @@ export const mockState: MatchState = {
   isLoading: false,
 };
 
-export function createMockState(mode: MatchMode): MatchState {
+export function createMockState(mode: MatchMode, options?: { writingMode?: boolean; problemCategory?: "addition" | "integrals" }): MatchState {
   const timestamp = Date.now();
   const nowIso = new Date(timestamp).toISOString();
 
   if (mode === "solo") {
     const soloPlayerId = "solo-player";
-    const roundDuration = DEFAULT_ROUND_DURATION_MS;
+    const writingMode = options?.writingMode || false;
+    const problemCategory = options?.problemCategory || "addition";
+    const isIntegral = problemCategory === "integrals";
+    
+    // Writing mode: 15 additions or 3 integrals
+    // Normal mode: 10 additions or 10 integrals
+    const totalRounds = writingMode ? (isIntegral ? 3 : 15) : 10;
+    const roundDuration = writingMode ? 300_000 : DEFAULT_ROUND_DURATION_MS; // 5 min for writing mode
     const now = Date.now();
     
     // Create practice rounds with proper future timestamps
-    const practiceRounds: RoundDocument[] = Array.from({ length: 10 }).map((_, index) => {
+    const practiceRounds: RoundDocument[] = Array.from({ length: totalRounds }).map((_, index) => {
       const roundNum = index + 1;
       const roundStart = now + (index * roundDuration);
       const roundEnd = roundStart + roundDuration;
       
       // Generate practice problems
-      const a = 10 + Math.floor(Math.random() * 40);
-      const b = 5 + Math.floor(Math.random() * 30);
-      const answer = a + b;
+      let prompt: string;
+      let canonical: { type: string; params: Record<string, unknown> };
+      
+      if (isIntegral) {
+        // Placeholder integrals (will be replaced by backend loading)
+        prompt = `$\\int x^${roundNum} \\, dx$`;
+        canonical = {
+          type: "integral",
+          params: { power: roundNum, answer: `$\\frac{x^${roundNum + 1}}{${roundNum + 1}} + C$` },
+        };
+      } else {
+        // Addition problems
+        const a = 10 + Math.floor(Math.random() * 40);
+        const b = 5 + Math.floor(Math.random() * 30);
+        const answer = a + b;
+        prompt = `${a} + ${b} = ?`;
+        canonical = {
+          type: "addition",
+          params: { a, b, answer },
+        };
+      }
       
       return {
         id: String(roundNum),
         status: index === 0 ? "active" : "pending",
-        prompt: `${a} + ${b} = ?`,
-        canonical: {
-          type: "addition",
-          params: { a, b, answer },
-        },
+        prompt,
+        canonical,
         difficulty: index < 3 ? "easy" : index < 7 ? "medium" : "hard",
         createdBy: "practice:v1",
         startAt: new Date(roundStart).toISOString(),
@@ -130,9 +152,11 @@ export function createMockState(mode: MatchMode): MatchState {
         status: "active",
         mode: "solo",
         settings: { 
-          rounds: 10,
+          rounds: totalRounds,
           roundDurationMs: roundDuration,
           shareOpponentPage: false,
+          writingMode,
+          problemCategory,
         },
         playerIds: [soloPlayerId],
         players: {

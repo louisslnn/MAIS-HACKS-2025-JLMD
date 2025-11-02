@@ -23,6 +23,8 @@ export interface MatchSettings {
   rounds: number;
   roundDurationMs: number;
   shareOpponentPage: boolean;
+  writingMode?: boolean;
+  problemCategory?: "addition" | "integrals";
 }
 
 export interface MatchDocument {
@@ -66,6 +68,8 @@ export interface AnswerDocument {
   correct: boolean;
   judgedAt: string;
   judgeVersion?: number;
+  ocrConfidence?: number;
+  ocrNotes?: string;
 }
 
 export interface LeaderboardEntry {
@@ -81,6 +85,21 @@ export interface MatchState {
   answers: Record<string, AnswerDocument[]>;
   isLoading: boolean;
   error?: string;
+}
+
+export interface OCRVerificationResult {
+  id: number;
+  type: string;
+  is_correct: boolean;
+  confidence: number;
+  notes: string;
+}
+
+export interface WritingModeSubmission {
+  pageNumber: number;
+  imageBase64: string;
+  problemIds: string[];
+  expectedAnswers: Array<{ id: string; answer: string; type: string }>;
 }
 
 export const DEFAULT_ROUND_DURATION_MS = 45_000;
