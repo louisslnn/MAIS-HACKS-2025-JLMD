@@ -126,26 +126,69 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
         setIsProcessingOCR(true);
         
         // Simulate OCR processing
-        setTimeout(() => {
+        setTimeout(async () => {
           console.log("Writing mode complete, all screenshots captured");
           
-          // Simulate completing all rounds with dummy answers
-          // This will trigger the match completion logic
+          // Simulate OCR results: randomly mark some as correct
+          // In production, this would call verifyWrittenAnswers and parse results
           if (match.mode === "solo" && state.rounds) {
-            // Submit answers for all remaining rounds to complete the practice
-            state.rounds.forEach((round) => {
+            const totalRounds = state.rounds.length;
+            let correctCount = 0;
+            const baseScore = 100; // Base points per correct answer
+            
+            // Simulate OCR results: 60-80% accuracy
+            const accuracy = 0.6 + Math.random() * 0.2; // 60-80% correct
+            const expectedCorrect = Math.floor(totalRounds * accuracy);
+            
+            // Submit answers for all rounds with simulated correctness
+            state.rounds.forEach((round, index) => {
               if (round.status !== "locked") {
-                submitPracticeAnswer(round.id, "0"); // Dummy answer
+                // Simulate correct/incorrect based on expected accuracy
+                const isCorrect = index < expectedCorrect;
+                if (isCorrect) correctCount++;
+                
+                // Get expected answer from canonical params
+                let answerValue: string;
+                if (round.canonical.type === "addition") {
+                  const params = round.canonical.params as { a: number; b: number; answer: number };
+                  answerValue = String(isCorrect ? params.answer : params.answer + Math.floor(Math.random() * 10) + 1);
+                } else {
+                  // For integrals, just use a placeholder
+                  answerValue = isCorrect ? "correct" : "incorrect";
+                }
+                
+                submitPracticeAnswer(round.id, answerValue);
               }
             });
+            
+            // Calculate and update score
+            const calculatedScore = correctCount * baseScore;
+            
+            // Update player stats in match state
+            if (state.match && state.match.players) {
+              const playerId = state.match.playerIds[0];
+              const player = state.match.players[playerId];
+              if (player) {
+                player.score = calculatedScore;
+                player.correctCount = correctCount;
+                player.totalTimeMs = totalRounds * 5000; // Simulated time: 5s per problem
+              }
+            }
+            
+            // Mark match as completed after a short delay
+            setTimeout(() => {
+              if (state.match) {
+                state.match.status = "completed";
+              }
+            }, 500);
           }
           
           setIsProcessingOCR(false);
           
           // In production with real OCR:
           // 1. Call verifyWrittenAnswers with newScreenshots
-          // 2. Parse OCR results
-          // 3. Update answers with correct/incorrect based on OCR
+          // 2. Parse OCR results to get correct/incorrect for each problem
+          // 3. Update player.score, player.correctCount based on OCR results
           // 4. Display in MatchResults
         }, 2000);
       }

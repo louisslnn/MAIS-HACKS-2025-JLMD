@@ -63,28 +63,72 @@ export function MatchResults({ match, userId, onPlayAgain }: MatchResultsProps) 
   const opponentId = match.playerIds.find((id) => id !== userId);
   const opponent = opponentId ? match.players[opponentId] : null;
 
-  if (!player || !opponent) {
+  if (!player) {
     return null;
   }
 
-  const playerWon = player.correctCount > opponent.correctCount ||
-    (player.correctCount === opponent.correctCount && player.totalTimeMs < opponent.totalTimeMs);
-  const isDraw = player.correctCount === opponent.correctCount && 
-    Math.abs(player.totalTimeMs - opponent.totalTimeMs) <= 100;
+  // For solo/practice mode, show completion message instead of win/loss
+  const isSolo = match.mode === "solo";
+  
+  let result: string;
+  let resultColor: string;
+  let bgColor: string;
+  
+  if (isSolo) {
+    // Practice mode: Show score-based feedback
+    const totalRounds = match.settings.rounds || 10;
+    const percentage = (player.correctCount / totalRounds) * 100;
+    
+    if (percentage >= 80) {
+      result = "Excellent! 🌟";
+      resultColor = "text-green-600";
+      bgColor = "bg-green-50";
+    } else if (percentage >= 60) {
+      result = "Good Job! 👍";
+      resultColor = "text-blue-600";
+      bgColor = "bg-blue-50";
+    } else {
+      result = "Keep Practicing! 💪";
+      resultColor = "text-yellow-600";
+      bgColor = "bg-yellow-50";
+    }
+  } else {
+    // Ranked mode: Show win/loss
+    if (!opponent) return null;
+    
+    const playerWon = player.correctCount > opponent.correctCount ||
+      (player.correctCount === opponent.correctCount && player.totalTimeMs < opponent.totalTimeMs);
+    const isDraw = player.correctCount === opponent.correctCount && 
+      Math.abs(player.totalTimeMs - opponent.totalTimeMs) <= 100;
 
-  const result = isDraw ? "Draw" : playerWon ? "Victory!" : "Defeat";
-  const resultColor = isDraw ? "text-yellow-600" : playerWon ? "text-green-600" : "text-red-600";
-  const bgColor = isDraw ? "bg-yellow-50" : playerWon ? "bg-green-50" : "bg-red-50";
+    result = isDraw ? "Draw" : playerWon ? "Victory!" : "Defeat";
+    resultColor = isDraw ? "text-yellow-600" : playerWon ? "text-green-600" : "text-red-600";
+    bgColor = isDraw ? "bg-yellow-50" : playerWon ? "bg-green-50" : "bg-red-50";
+  }
 
   return (
     <div className="space-y-6">
       {/* Result Header */}
       <div className={`rounded-2xl ${bgColor} p-8 text-center`}>
-        <h2 className={`text-4xl font-bold ${resultColor}`}>{result}</h2>
+        <h2 className={`text-4xl font-bold ${resultColor} mb-4`}>{result}</h2>
+        
+        {/* Score Display - Prominent for practice mode */}
+        {isSolo && (
+          <div className="mb-4">
+            <p className="text-sm text-ink-soft mb-2">Final Score</p>
+            <div className="text-6xl font-bold text-ink">
+              {player.score}
+            </div>
+            <p className="text-lg text-ink-soft mt-2">
+              {player.correctCount} out of {match.settings.rounds || 10} correct
+            </p>
+          </div>
+        )}
+        
         {loading && (
           <p className="mt-4 text-sm text-ink-soft">Calculating rating change...</p>
         )}
-        {!loading && ratingChange && (
+        {!loading && ratingChange && !isSolo && (
           <div className="mt-4">
             <p className="text-sm text-ink-soft">Rating Change</p>
             <div className="flex items-center justify-center gap-2 mt-2">
@@ -100,17 +144,23 @@ export function MatchResults({ match, userId, onPlayAgain }: MatchResultsProps) 
       </div>
 
       {/* Match Statistics */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className={`grid gap-4 ${isSolo ? 'md:grid-cols-1' : 'md:grid-cols-2'}`}>
         <div className="rounded-xl border border-border bg-surface p-6">
-          <p className="text-xs uppercase tracking-[0.3em] text-ink-subtle mb-3">You</p>
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span className="text-ink-soft">Score</span>
-              <span className="font-semibold text-ink">{player.score}</span>
+          <p className="text-xs uppercase tracking-[0.3em] text-ink-subtle mb-3">Your Performance</p>
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-ink-soft">Final Score</span>
+              <span className="text-3xl font-bold text-brand">{player.score}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-ink-soft">Correct Answers</span>
-              <span className="font-semibold text-ink">{player.correctCount}</span>
+              <span className="font-semibold text-ink">{player.correctCount} / {match.settings.rounds || 10}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-ink-soft">Accuracy</span>
+              <span className="font-semibold text-ink">
+                {((player.correctCount / (match.settings.rounds || 10)) * 100).toFixed(0)}%
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-ink-soft">Total Time</span>
@@ -121,27 +171,29 @@ export function MatchResults({ match, userId, onPlayAgain }: MatchResultsProps) 
           </div>
         </div>
 
-        <div className="rounded-xl border border-border bg-surface p-6">
-          <p className="text-xs uppercase tracking-[0.3em] text-ink-subtle mb-3">
-            {opponent.displayName}
-          </p>
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span className="text-ink-soft">Score</span>
-              <span className="font-semibold text-ink">{opponent.score}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-ink-soft">Correct Answers</span>
-              <span className="font-semibold text-ink">{opponent.correctCount}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-ink-soft">Total Time</span>
-              <span className="font-semibold text-ink">
-                {(opponent.totalTimeMs / 1000).toFixed(1)}s
-              </span>
+        {!isSolo && opponent && (
+          <div className="rounded-xl border border-border bg-surface p-6">
+            <p className="text-xs uppercase tracking-[0.3em] text-ink-subtle mb-3">
+              {opponent.displayName}
+            </p>
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <span className="text-ink-soft">Score</span>
+                <span className="font-semibold text-ink">{opponent.score}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-ink-soft">Correct Answers</span>
+                <span className="font-semibold text-ink">{opponent.correctCount}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-ink-soft">Total Time</span>
+                <span className="font-semibold text-ink">
+                  {(opponent.totalTimeMs / 1000).toFixed(1)}s
+                </span>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Action Buttons */}
