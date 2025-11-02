@@ -152,10 +152,12 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
       }
     } catch (error) {
       console.error("Error generating AI feedback:", error);
+    } finally {
+      // Always clear accumulated results and reset processing state
+      accumulatedResultsRef.current = [];
+      setIsProcessingFinal(false);
+      console.log("[GameBoard] Final processing complete, match should now show as completed");
     }
-    
-    // Clear accumulated results after processing
-    accumulatedResultsRef.current = [];
   }, [submitPracticeAnswer]);
 
   const handleCaptureScreenshot = useCallback(async () => {
