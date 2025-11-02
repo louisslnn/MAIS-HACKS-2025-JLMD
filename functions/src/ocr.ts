@@ -71,30 +71,59 @@ export const verifyWrittenAnswers = functions.https.onCall(
         // Upload image to fal.ai
         const imageUrl = await fal.storage.upload(blob);
 
-        // Build the prompt similar to Python script
-        const expectedStr = JSON.stringify(expectedAnswers, null, 2);
+        // Build the prompt - handle integrals differently
+        const problemsInfo = expectedAnswers.map(item => {
+          if (item.type === "integral") {
+            // For integrals: provide only the problem, Claude must solve it
+            return {
+              id: item.id,
+              type: "integral",
+              problem: item.problem,
+              note: "You must solve this integral yourself and check if the user's answer is correct"
+            };
+          } else {
+            // For additions: provide both problem and answer
+            return {
+              id: item.id,
+              type: item.type,
+              problem: item.problem,
+              expected_answer: item.answer
+            };
+          }
+        });
+        
+        const expectedStr = JSON.stringify(problemsInfo, null, 2);
 
         const prompt = `You are checking math answers from this image. WORK QUICKLY AND EFFICIENTLY.
 
-Expected Problems and Answers:
+Problems to Check:
 ${expectedStr}
 
 For each problem in the expected list, analyze the image to determine:
 1. If the problem appears in the image
 2. If an answer is given in the image
-3. If that answer matches the expected answer OR is mathematically equivalent
-4. Your confidence level in the verification (0.0 to 1.0)
+3. FOR INTEGRALS: First SOLVE the integral yourself, then check if the user's answer matches your solution
+4. FOR ADDITIONS/OTHER: Check if the answer matches the provided expected_answer
+5. Whether the answer is mathematically equivalent (even if written differently)
+6. Your confidence level in the verification (0.0 to 1.0)
+
+IMPORTANT - FOR INTEGRALS:
+- You MUST solve each integral yourself to determine the correct answer
+- The integral problems are provided in LaTeX notation (e.g., $\\int x^3 \\, dx$)
+- Compare the user's handwritten answer with YOUR calculated solution
+- Accept any mathematically equivalent antiderivative form
 
 IMPORTANT - EQUIVALENT ANSWERS ARE CORRECT:
 - Fractions: Accept equivalent forms (e.g., 1/2 = 2/4 = 0.5 = 50%)
 - Decimals: Accept fraction equivalents (e.g., 0.5 = 1/2 = 5/10)
 - Simplified vs unsimplified: Accept both (e.g., 2/4 = 1/2, 4/2 = 2)
 - Different notations: Accept (e.g., 2x = 2*x, x² = x^2)
-- Constants: Accept (e.g., C = +C, +C = C)
-- For integrals: Accept any antiderivative form (e.g., x²/2 = x^2/2 = ½x²)
+- Constants: Accept (e.g., C = +C, +C = C, omitting +C is also acceptable)
+- For integrals: Accept any antiderivative form (e.g., x²/2 = x^2/2 = ½x² = (1/2)x^2)
 - Negative signs: Accept equivalent placement (e.g., -1/2 = -0.5 = -2/4)
 - COEFFICIENT PLACEMENT (CRITICAL): Coefficient placement does NOT affect correctness. All these are EQUIVALENT and must be marked as CORRECT:
   * Examples: x^3/3 = 1/3 x^3 = (1/3)x^3 = x^3/3 = (1/3)*x^3
+  * Examples: x^4/4 = 1/4 x^4 = (1/4)x^4 = 0.25x^4
   * Examples: 2x^2 = 2*x^2 = x^2*2 = (2)x^2
   * Examples: 5x = 5*x = x*5 = (5)x
   * The order of coefficient and variable term does NOT matter: "coefficient placement differs" is NOT a valid reason to mark as incorrect

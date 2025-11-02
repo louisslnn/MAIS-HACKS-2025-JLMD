@@ -146,7 +146,7 @@ export function createMockState(mode: MatchMode, options?: { writingMode?: boole
           type: "integral",
           params: {
             problemId: integralProblem.id,
-            answer: integralProblem.answer,
+            // No answer field - OCR will solve the integral itself
           },
         };
       } else {

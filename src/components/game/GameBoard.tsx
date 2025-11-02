@@ -224,16 +224,17 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
         }).filter(Boolean) as RoundDocument[];
         
         const expectedAnswers = actualPageRounds.map((round) => {
-          let expectedAnswer: string;
+          let expectedAnswer: string | undefined;
           let problemType: string;
+          let problem: string = round.prompt;
           
           if (round.canonical.type === "addition") {
             const params = round.canonical.params as { a: number; b: number; answer: number };
             expectedAnswer = String(params.answer);
             problemType = "addition";
           } else if (round.canonical.type === "integral") {
-            const params = round.canonical.params as { answer: string };
-            expectedAnswer = params.answer || "";
+            // For integrals, we DON'T send the answer - OCR will solve it
+            expectedAnswer = undefined;
             problemType = "integral";
           } else {
             expectedAnswer = "";
@@ -242,7 +243,8 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
           
           return {
             id: String(parseInt(round.id, 10) || round.id),
-            answer: expectedAnswer,
+            problem: problem, // Send the problem text (integral to solve)
+            answer: expectedAnswer, // undefined for integrals
             type: problemType,
           };
         });

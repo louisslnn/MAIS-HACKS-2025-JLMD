@@ -144,7 +144,12 @@ export interface WritingModeSubmission {
   pageNumber: number;
   imageBase64: string;
   problemIds: string[];
-  expectedAnswers: Array<{ id: string; answer: string; type: string }>;
+  expectedAnswers: Array<{ 
+    id: string; 
+    problem: string;
+    answer?: string; // Optional for integrals
+    type: string; 
+  }>;
 }
 
 export interface OCRVerificationResult {
