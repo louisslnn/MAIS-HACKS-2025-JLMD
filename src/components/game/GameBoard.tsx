@@ -196,38 +196,32 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
               let correctCount = 0;
               const totalRounds = state.rounds.length;
               
-              // Map OCR results to rounds - need to match by problem order
-              // OCR returns results in order of problems on each page
-              let resultIndex = 0;
-              
-              for (let i = 0; i < state.rounds.length; i += problemsPerPage) {
-                const pageRounds = state.rounds.slice(i, i + problemsPerPage);
+              // Map OCR results to rounds
+              // OCR returns results in order with numeric IDs matching the expectedAnswers IDs
+              ocrResult.data.results.forEach((result) => {
+                // Find the round by matching the numeric ID
+                const roundId = String(result.id);
+                const round = state.rounds.find(r => r.id === roundId);
                 
-                pageRounds.forEach((round) => {
-                  if (resultIndex < ocrResult.data.results.length) {
-                    const result = ocrResult.data.results[resultIndex];
-                    
-                    // Get the expected answer
-                    let answerValue: string;
-                    if (round.canonical.type === "addition") {
-                      const params = round.canonical.params as { a: number; b: number; answer: number };
-                      answerValue = String(params.answer);
-                    } else {
-                      const params = round.canonical.params as { answer: string };
-                      answerValue = params.answer || "";
-                    }
-                    
-                    // Submit the answer
-                    submitPracticeAnswer(round.id, answerValue);
-                    
-                    if (result.is_correct) {
-                      correctCount++;
-                    }
-                    
-                    resultIndex++;
+                if (round) {
+                  // Get the expected answer
+                  let answerValue: string;
+                  if (round.canonical.type === "addition") {
+                    const params = round.canonical.params as { a: number; b: number; answer: number };
+                    answerValue = String(params.answer);
+                  } else {
+                    const params = round.canonical.params as { answer: string };
+                    answerValue = params.answer || "";
                   }
-                });
-              }
+                  
+                  // Submit the answer
+                  submitPracticeAnswer(round.id, answerValue);
+                  
+                  if (result.is_correct) {
+                    correctCount++;
+                  }
+                }
+              });
               
               // Update player stats
               if (state.match && state.match.players) {
