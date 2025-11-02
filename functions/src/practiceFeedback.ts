@@ -74,24 +74,19 @@ export const generatePracticeFeedback = functions.https.onCall(
       const accuracy = ((correctCount / totalProblems) * 100).toFixed(0);
       const problemType = results[0]?.type === "integral" ? "integrals" : "addition problems";
 
-      const prompt = `You are a friendly, encouraging math tutor providing feedback to a student who just completed a practice session.
+      const prompt = `You are a friendly math tutor giving quick feedback after a practice session.
 
-**Practice Results:**
-- Total Problems: ${totalProblems}
-- Correct: ${correctCount}
-- Accuracy: ${accuracy}%
-- Problem Type: ${problemType}
+**Results:** ${correctCount}/${totalProblems} correct (${accuracy}%) - ${problemType}
 
-**Detailed Results:**
+**Details:**
 ${problemSummary}
 
-Generate a brief, personalized feedback message (2-3 paragraphs, max 150 words) that:
-1. Starts with an encouraging opening based on their performance
-2. Highlights what they did well (specific problems or patterns)
-3. Gently points out areas for improvement if accuracy < 80%
-4. Ends with motivational advice for their next practice session
+Write a concise, encouraging feedback message (60-80 words max, 1-2 short paragraphs):
+- Start with a positive comment based on performance
+- Mention 1-2 specific problems they got right or areas to improve
+- End with brief motivational advice
 
-Keep the tone friendly, supportive, and age-appropriate. Use simple language. Don't use bullet points, just flowing paragraphs.`;
+Be warm and supportive. Use simple, natural language. No bullet points.`;
 
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini", // GPT-4.1 mini

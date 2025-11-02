@@ -71,25 +71,14 @@ export const verifyWrittenAnswers = functions.https.onCall(
         // Upload image to fal.ai
         const imageUrl = await fal.storage.upload(blob);
 
-        // Build the prompt - handle integrals differently
+        // Build the prompt - OCR solves ALL problems
         const problemsInfo = expectedAnswers.map(item => {
-          if (item.type === "integral") {
-            // For integrals: provide only the problem, Claude must solve it
-            return {
-              id: item.id,
-              type: "integral",
-              problem: item.problem,
-              note: "You must solve this integral yourself and check if the user's answer is correct"
-            };
-          } else {
-            // For additions: provide both problem and answer
-            return {
-              id: item.id,
-              type: item.type,
-              problem: item.problem,
-              expected_answer: item.answer
-            };
-          }
+          return {
+            id: item.id,
+            type: item.type,
+            problem: item.problem,
+            note: "You must solve this problem yourself and check if the user's answer is correct"
+          };
         });
         
         const expectedStr = JSON.stringify(problemsInfo, null, 2);
@@ -102,16 +91,16 @@ ${expectedStr}
 For each problem in the expected list, analyze the image to determine:
 1. If the problem appears in the image
 2. If an answer is given in the image
-3. FOR INTEGRALS: First SOLVE the integral yourself, then check if the user's answer matches your solution
-4. FOR ADDITIONS/OTHER: Check if the answer matches the provided expected_answer
+3. SOLVE the problem yourself (integrals, additions, etc.)
+4. Check if the user's answer matches YOUR solution
 5. Whether the answer is mathematically equivalent (even if written differently)
 6. Your confidence level in the verification (0.0 to 1.0)
 
-IMPORTANT - FOR INTEGRALS:
-- You MUST solve each integral yourself to determine the correct answer
-- The integral problems are provided in LaTeX notation (e.g., $\\int x^3 \\, dx$)
+CRITICAL - YOU MUST SOLVE ALL PROBLEMS:
+- Integrals: Solve the integral from the LaTeX notation (e.g., $\\int x^3 \\, dx$ → x^4/4 + C)
+- Additions: Solve the arithmetic (e.g., "45 + 23" → 68)
 - Compare the user's handwritten answer with YOUR calculated solution
-- Accept any mathematically equivalent antiderivative form
+- Accept any mathematically equivalent form
 
 IMPORTANT - EQUIVALENT ANSWERS ARE CORRECT:
 - Fractions: Accept equivalent forms (e.g., 1/2 = 2/4 = 0.5 = 50%)

@@ -134,13 +134,16 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
       console.log("[GameBoard] Feedback response:", feedbackResponse);
       if (feedbackResponse.data?.success && feedbackResponse.data.feedback) {
         console.log("[GameBoard] AI feedback generated successfully:", feedbackResponse.data.feedback);
-        setAiFeedback(feedbackResponse.data.feedback);
+        
         // Store in localStorage for MatchResults to retrieve
         try {
           const storageKey = `practice-feedback-${match.id}`;
           console.log("[GameBoard] Storing feedback with key:", storageKey);
           localStorage.setItem(storageKey, feedbackResponse.data.feedback);
           console.log("[GameBoard] Feedback stored successfully");
+          
+          // Also set in state so it can be passed to MatchResults
+          setAiFeedback(feedbackResponse.data.feedback);
         } catch (error) {
           console.error("[GameBoard] Failed to store feedback in localStorage:", error);
         }
@@ -224,27 +227,22 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
         }).filter(Boolean) as RoundDocument[];
         
         const expectedAnswers = actualPageRounds.map((round) => {
-          let expectedAnswer: string | undefined;
           let problemType: string;
           let problem: string = round.prompt;
           
           if (round.canonical.type === "addition") {
-            const params = round.canonical.params as { a: number; b: number; answer: number };
-            expectedAnswer = String(params.answer);
             problemType = "addition";
           } else if (round.canonical.type === "integral") {
-            // For integrals, we DON'T send the answer - OCR will solve it
-            expectedAnswer = undefined;
             problemType = "integral";
           } else {
-            expectedAnswer = "";
             problemType = "unknown";
           }
           
+          // Don't send answers - OCR will solve everything itself
           return {
             id: String(parseInt(round.id, 10) || round.id),
-            problem: problem, // Send the problem text (integral to solve)
-            answer: expectedAnswer, // undefined for integrals
+            problem: problem, // Send the problem text for OCR to solve
+            answer: undefined, // No answers sent - OCR solves it
             type: problemType,
           };
         });

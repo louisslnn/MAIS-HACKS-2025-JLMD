@@ -65,14 +65,30 @@ export function MatchResults({ match, userId, onPlayAgain, aiFeedback }: MatchRe
   useEffect(() => {
     if (match.mode === "solo" && match.id) {
       try {
-        const feedback = localStorage.getItem(`practice-feedback-${match.id}`);
-        console.log("[MatchResults] Looking for feedback with key:", `practice-feedback-${match.id}`);
-        console.log("[MatchResults] Found feedback:", feedback);
-        if (feedback) {
-          setStoredFeedback(feedback);
-          // Clean up after reading
-          localStorage.removeItem(`practice-feedback-${match.id}`);
-        }
+        const storageKey = `practice-feedback-${match.id}`;
+        console.log("[MatchResults] Looking for feedback with key:", storageKey);
+        
+        // Try multiple times with a delay in case feedback is still being generated
+        let attempts = 0;
+        const maxAttempts = 5;
+        
+        const tryLoadFeedback = () => {
+          const feedback = localStorage.getItem(storageKey);
+          console.log(`[MatchResults] Attempt ${attempts + 1}/${maxAttempts} - Found feedback:`, feedback ? "YES" : "NO");
+          
+          if (feedback) {
+            console.log("[MatchResults] Feedback content:", feedback);
+            setStoredFeedback(feedback);
+            // Clean up after reading
+            localStorage.removeItem(storageKey);
+          } else if (attempts < maxAttempts - 1) {
+            attempts++;
+            console.log("[MatchResults] Retrying in 500ms...");
+            setTimeout(tryLoadFeedback, 500);
+          }
+        };
+        
+        tryLoadFeedback();
       } catch (error) {
         console.error("Failed to retrieve feedback from localStorage:", error);
       }
