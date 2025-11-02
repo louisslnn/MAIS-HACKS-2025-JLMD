@@ -20,7 +20,7 @@ interface GameBoardProps {
 
 export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
   const { user } = useAuth();
-  const { opponentState, state } = useMatch();
+  const { opponentState, state, submitPracticeAnswer } = useMatch();
   const currentUserId = user?.uid;
   
   const isWritingMode = match.settings.writingMode === true;
@@ -125,17 +125,28 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
         console.log("All pages captured, processing with OCR...", newScreenshots.length);
         setIsProcessingOCR(true);
         
-        // Simulate OCR processing (replace with actual OCR call later)
+        // Simulate OCR processing
         setTimeout(() => {
           console.log("Writing mode complete, all screenshots captured");
+          
+          // Simulate completing all rounds with dummy answers
+          // This will trigger the match completion logic
+          if (match.mode === "solo" && state.rounds) {
+            // Submit answers for all remaining rounds to complete the practice
+            state.rounds.forEach((round) => {
+              if (round.status !== "locked") {
+                submitPracticeAnswer(round.id, "0"); // Dummy answer
+              }
+            });
+          }
+          
           setIsProcessingOCR(false);
-          // TODO: Call verifyWrittenAnswers here with all screenshots
-          // TODO: Navigate to results page or mark match as complete
-          alert("OCR Processing Complete!\n\nThis is where the results would be displayed.\n\n" +
-                "Next steps:\n" +
-                "1. Extract problem data from rounds\n" +
-                "2. Call verifyWrittenAnswers function\n" +
-                "3. Display results in MatchResults component");
+          
+          // In production with real OCR:
+          // 1. Call verifyWrittenAnswers with newScreenshots
+          // 2. Parse OCR results
+          // 3. Update answers with correct/incorrect based on OCR
+          // 4. Display in MatchResults
         }, 2000);
       }
     } catch (error) {
