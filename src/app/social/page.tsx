@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   collection,
@@ -49,7 +49,7 @@ interface Friend {
   addedAt: Date;
 }
 
-export default function SocialPage() {
+function SocialPageContent() {
   const { user } = useAuth();
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [friends, setFriends] = useState<Friend[]>([]);
@@ -781,5 +781,13 @@ export default function SocialPage() {
       )}
       </div>
     </>
+  );
+}
+
+export default function SocialPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><p>Loading...</p></div>}>
+      <SocialPageContent />
+    </Suspense>
   );
 }
