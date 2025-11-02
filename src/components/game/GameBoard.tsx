@@ -107,6 +107,9 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
       }
     });
     
+    // Wait a tick for state to propagate
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
     // Generate AI feedback
     try {
       console.log("Generating AI feedback...");

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import { Button } from "@/components/ui";
 import { useMatch } from "@/contexts/match-context";
@@ -62,6 +62,13 @@ export default function PlayPage() {
     state.rounds.find((round) => round.status === "active") ?? state.rounds[0];
 
   const isMatchCompleted = state.match?.status === "completed";
+  
+  // Debug logging for match status
+  useEffect(() => {
+    if (state.match) {
+      console.log("[PlayPage] Match status:", state.match.status, "isMatchCompleted:", isMatchCompleted);
+    }
+  }, [state.match?.status, isMatchCompleted, state.match]);
 
   const handlePlayAgain = async () => {
     // Reset to mode selection by clearing active match
