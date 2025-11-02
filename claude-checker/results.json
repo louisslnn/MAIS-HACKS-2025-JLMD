@@ -1,0 +1,85 @@
+{
+  "model": "anthropic/claude-sonnet-4.5 (via fal-ai/any-llm/vision)",
+  "image_analyzed": "C:\\Users\\julie\\Documents\\Github\\MAIS-HACKS-2025-JLMD\\claude-checker\\testsheet.jpg",
+  "claude_response": "{\"results\":[{\"id\":1,\"type\":\"addition\",\"is_correct\":true,\"confidence\":1.0,\"notes\":\"\"},{\"id\":2,\"type\":\"addition\",\"is_correct\":true,\"confidence\":1.0,\"notes\":\"\"},{\"id\":3,\"type\":\"addition\",\"is_correct\":true,\"confidence\":1.0,\"notes\":\"\"},{\"id\":4,\"type\":\"addition\",\"is_correct\":true,\"confidence\":1.0,\"notes\":\"\"},{\"id\":5,\"type\":\"addition\",\"is_correct\":true,\"confidence\":1.0,\"notes\":\"\"},{\"id\":6,\"type\":\"addition\",\"is_correct\":false,\"confidence\":0.95,\"notes\":\"7+9=16 but answer shows 12\"},{\"id\":7,\"type\":\"addition\",\"is_correct\":false,\"confidence\":0.9,\"notes\":\"6+10=16 but answer shows 12\"},{\"id\":8,\"type\":\"addition\",\"is_correct\":true,\"confidence\":1.0,\"notes\":\"\"},{\"id\":9,\"type\":\"addition\",\"is_correct\":true,\"confidence\":1.0,\"notes\":\"\"},{\"id\":10,\"type\":\"addition\",\"is_correct\":true,\"confidence\":1.0,\"notes\":\"\"}]}",
+  "raw_result": {
+    "output": "{\"results\":[{\"id\":1,\"type\":\"addition\",\"is_correct\":true,\"confidence\":1.0,\"notes\":\"\"},{\"id\":2,\"type\":\"addition\",\"is_correct\":true,\"confidence\":1.0,\"notes\":\"\"},{\"id\":3,\"type\":\"addition\",\"is_correct\":true,\"confidence\":1.0,\"notes\":\"\"},{\"id\":4,\"type\":\"addition\",\"is_correct\":true,\"confidence\":1.0,\"notes\":\"\"},{\"id\":5,\"type\":\"addition\",\"is_correct\":true,\"confidence\":1.0,\"notes\":\"\"},{\"id\":6,\"type\":\"addition\",\"is_correct\":false,\"confidence\":0.95,\"notes\":\"7+9=16 but answer shows 12\"},{\"id\":7,\"type\":\"addition\",\"is_correct\":false,\"confidence\":0.9,\"notes\":\"6+10=16 but answer shows 12\"},{\"id\":8,\"type\":\"addition\",\"is_correct\":true,\"confidence\":1.0,\"notes\":\"\"},{\"id\":9,\"type\":\"addition\",\"is_correct\":true,\"confidence\":1.0,\"notes\":\"\"},{\"id\":10,\"type\":\"addition\",\"is_correct\":true,\"confidence\":1.0,\"notes\":\"\"}]}",
+    "reasoning": null,
+    "partial": false,
+    "error": null
+  },
+  "verification_results": {
+    "results": [
+      {
+        "id": 1,
+        "type": "addition",
+        "is_correct": true,
+        "confidence": 1.0,
+        "notes": ""
+      },
+      {
+        "id": 2,
+        "type": "addition",
+        "is_correct": true,
+        "confidence": 1.0,
+        "notes": ""
+      },
+      {
+        "id": 3,
+        "type": "addition",
+        "is_correct": true,
+        "confidence": 1.0,
+        "notes": ""
+      },
+      {
+        "id": 4,
+        "type": "addition",
+        "is_correct": true,
+        "confidence": 1.0,
+        "notes": ""
+      },
+      {
+        "id": 5,
+        "type": "addition",
+        "is_correct": true,
+        "confidence": 1.0,
+        "notes": ""
+      },
+      {
+        "id": 6,
+        "type": "addition",
+        "is_correct": false,
+        "confidence": 0.95,
+        "notes": "7+9=16 but answer shows 12"
+      },
+      {
+        "id": 7,
+        "type": "addition",
+        "is_correct": false,
+        "confidence": 0.9,
+        "notes": "6+10=16 but answer shows 12"
+      },
+      {
+        "id": 8,
+        "type": "addition",
+        "is_correct": true,
+        "confidence": 1.0,
+        "notes": ""
+      },
+      {
+        "id": 9,
+        "type": "addition",
+        "is_correct": true,
+        "confidence": 1.0,
+        "notes": ""
+      },
+      {
+        "id": 10,
+        "type": "addition",
+        "is_correct": true,
+        "confidence": 1.0,
+        "notes": ""
+      }
+    ]
+  }
+}
