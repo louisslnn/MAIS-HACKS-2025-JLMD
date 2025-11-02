@@ -506,14 +506,19 @@ export function MatchProvider({ children }: { children: React.ReactNode }) {
       };
       
       // Lock current round and activate next round
+      // For OCR mode, we might be submitting answers out of order, so lock this round
       const updatedRounds = prev.rounds.map((round, index) => {
         if (round.id === roundId) {
+          // Lock this round
           return { ...round, status: "locked" as const };
         }
-        // Activate next round
-        const currentIndex = prev.rounds.findIndex(r => r.id === roundId);
-        if (index === currentIndex + 1 && round.status === "pending") {
-          return { ...round, status: "active" as const };
+        // Only activate next round if we're in normal mode (not OCR batch mode)
+        // In OCR mode, we submit all at once so don't activate next rounds
+        if (isCorrect === undefined) {
+          const currentIndex = prev.rounds.findIndex(r => r.id === roundId);
+          if (index === currentIndex + 1 && round.status === "pending") {
+            return { ...round, status: "active" as const };
+          }
         }
         return round;
       });
