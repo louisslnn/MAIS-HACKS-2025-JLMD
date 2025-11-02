@@ -67,10 +67,11 @@ export function MatchResults({ match, userId, onPlayAgain, aiFeedback }: MatchRe
       try {
         const storageKey = `practice-feedback-${match.id}`;
         console.log("[MatchResults] Looking for feedback with key:", storageKey);
+        console.log("[MatchResults] All localStorage keys:", Object.keys(localStorage));
         
         // Try multiple times with a delay in case feedback is still being generated
         let attempts = 0;
-        const maxAttempts = 5;
+        const maxAttempts = 10; // Increased attempts
         
         const tryLoadFeedback = () => {
           const feedback = localStorage.getItem(storageKey);
@@ -83,12 +84,15 @@ export function MatchResults({ match, userId, onPlayAgain, aiFeedback }: MatchRe
             localStorage.removeItem(storageKey);
           } else if (attempts < maxAttempts - 1) {
             attempts++;
-            console.log("[MatchResults] Retrying in 500ms...");
-            setTimeout(tryLoadFeedback, 500);
+            console.log("[MatchResults] Retrying in 1000ms...");
+            setTimeout(tryLoadFeedback, 1000); // Increased delay
+          } else {
+            console.error("[MatchResults] Failed to find feedback after", maxAttempts, "attempts");
           }
         };
         
-        tryLoadFeedback();
+        // Start with a delay to give GameBoard time to store
+        setTimeout(tryLoadFeedback, 500);
       } catch (error) {
         console.error("Failed to retrieve feedback from localStorage:", error);
       }
