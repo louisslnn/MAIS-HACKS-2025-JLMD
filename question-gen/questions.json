@@ -1,0 +1,54 @@
+{
+  "addition": [
+    {
+      "id": 1,
+      "problem": "$1 + 10$",
+      "answer": 11
+    },
+    {
+      "id": 2,
+      "problem": "$12 + 4$",
+      "answer": 16
+    },
+    {
+      "id": 3,
+      "problem": "$1 + 8$",
+      "answer": 9
+    },
+    {
+      "id": 4,
+      "problem": "$8 + 3$",
+      "answer": 11
+    },
+    {
+      "id": 5,
+      "problem": "$16 + 10$",
+      "answer": 26
+    },
+    {
+      "id": 6,
+      "problem": "$15 + 9$",
+      "answer": 24
+    },
+    {
+      "id": 7,
+      "problem": "$8 + 10$",
+      "answer": 18
+    },
+    {
+      "id": 8,
+      "problem": "$13 + 9$",
+      "answer": 22
+    },
+    {
+      "id": 9,
+      "problem": "$20 + 15$",
+      "answer": 35
+    },
+    {
+      "id": 10,
+      "problem": "$20 + 10$",
+      "answer": 30
+    }
+  ]
+}
