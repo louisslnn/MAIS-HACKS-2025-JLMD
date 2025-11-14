@@ -1,6 +1,6 @@
 import { Timestamp } from "firebase-admin/firestore";
+import * as functions from "firebase-functions/v1";
 import { logger } from "firebase-functions";
-import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { z } from "zod";
 
 import { db, env } from "./config";
@@ -17,28 +17,29 @@ const submitAnswerSchema = z.object({
 
 function ensureParticipant(uid: string, match: MatchDocument) {
   if (!match.playerIds.includes(uid)) {
-    throw new HttpsError(
+    throw new functions.https.HttpsError(
       "permission-denied",
       "You are not a participant in this match.",
     );
   }
 }
 
-export const submitAnswer = onCall(
-  { enforceAppCheck: false, region: "us-central1" },
-  async (request) => {
+export const submitAnswer = functions
+  .region("us-central1")
+  .runWith({ secrets: ["OPENAI_API_KEY"], timeoutSeconds: 60, memory: "512MB" })
+  .https.onCall(async (data, context) => {
     try {
-      if (!request.auth) {
-        throw new HttpsError("unauthenticated", "Sign in to submit answers.");
+      if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "Sign in to submit answers.");
       }
 
-      const payload = submitAnswerSchema.safeParse(request.data);
+      const payload = submitAnswerSchema.safeParse(data);
       if (!payload.success) {
-        throw new HttpsError("invalid-argument", "Invalid submit payload.");
+        throw new functions.https.HttpsError("invalid-argument", "Invalid submit payload.");
       }
 
       const { matchId, roundId, value } = payload.data;
-      const uid = request.auth.uid;
+      const uid = context.auth.uid;
 
       const matchRef = db.collection("matches").doc(matchId);
       const roundRef = matchRef.collection("rounds").doc(roundId);
@@ -52,7 +53,7 @@ export const submitAnswer = onCall(
       await db.runTransaction(async (tx) => {
         const matchSnap = await tx.get(matchRef);
         if (!matchSnap.exists) {
-          throw new HttpsError("not-found", "Match not found.");
+          throw new functions.https.HttpsError("not-found", "Match not found.");
         }
 
         const match = matchSnap.data() as MatchDocument;
@@ -60,7 +61,7 @@ export const submitAnswer = onCall(
 
         const roundSnap = await tx.get(roundRef);
         if (!roundSnap.exists) {
-          throw new HttpsError("not-found", "Round not found.");
+          throw new functions.https.HttpsError("not-found", "Round not found.");
         }
 
         const round = roundSnap.data() as {
@@ -77,7 +78,7 @@ export const submitAnswer = onCall(
             uid,
             roundStatus: round.status,
           });
-          throw new HttpsError(
+          throw new functions.https.HttpsError(
             "failed-precondition",
             round.status === "locked" 
               ? "Time's up! This round is no longer accepting answers."
@@ -224,21 +225,20 @@ export const submitAnswer = onCall(
       logger.error("Submit answer error", {
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
-        matchId: request.data?.matchId,
-        roundId: request.data?.roundId,
-        uid: request.auth?.uid,
+        matchId: data?.matchId,
+        roundId: data?.roundId,
+        uid: context.auth?.uid,
       });
       
       // Re-throw HttpsError as-is
-      if (error instanceof HttpsError) {
+      if (error instanceof functions.https.HttpsError) {
         throw error;
       }
       
       // Wrap other errors
-      throw new HttpsError(
+      throw new functions.https.HttpsError(
         "internal",
         error instanceof Error ? error.message : "An error occurred while submitting your answer.",
       );
     }
-  },
-);
+  });

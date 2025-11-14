@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 
-import { Button } from "@/components/ui";
+import { Button, Dialog } from "@/components/ui";
 import type { MatchDocument } from "@/lib/game/types";
+import { triggerMatchEmote } from "@/lib/firebase/functions";
 
 interface MatchResultsProps {
   match: MatchDocument;
@@ -19,10 +21,44 @@ interface RatingChange {
   delta: number;
 }
 
+const EMOTES = [
+  {
+    id: "giphy",
+    label: "Fireworks",
+    src: "/Gifs/giphy.gif",
+  },
+  {
+    id: "math-zach-galifianakis",
+    label: "Genius Mode",
+    src: "/Gifs/math-zach-galifianakis.gif",
+  },
+  {
+    id: "maths",
+    label: "Brainwave",
+    src: "/Gifs/maths.gif",
+  },
+  {
+    id: "ratio-maths",
+    label: "Victory Dance",
+    src: "/Gifs/ratio-maths.gif",
+  },
+] as const;
+
+type EmoteId = (typeof EMOTES)[number]["id"];
+
 export function MatchResults({ match, userId, onPlayAgain, aiFeedback }: MatchResultsProps) {
   const [ratingChange, setRatingChange] = useState<RatingChange | null>(null);
   const [loading, setLoading] = useState(true);
   const [storedFeedback, setStoredFeedback] = useState<string | null>(null);
+  const celebration = match.celebration;
+  const initialEmote = celebration?.emoteId && EMOTES.some((emote) => emote.id === celebration.emoteId)
+    ? (celebration.emoteId as EmoteId)
+    : null;
+  const [isEmoteDialogOpen, setIsEmoteDialogOpen] = useState(false);
+  const [isSendingEmote, setIsSendingEmote] = useState(false);
+  const [emoteError, setEmoteError] = useState<string | null>(null);
+  const [activeEmote, setActiveEmote] = useState<EmoteId | null>(initialEmote);
+  const [showCelebration, setShowCelebration] = useState(Boolean(initialEmote));
 
   useEffect(() => {
     if (!userId) return;
@@ -69,6 +105,22 @@ export function MatchResults({ match, userId, onPlayAgain, aiFeedback }: MatchRe
     }
   }, [aiFeedback, storedFeedback]);
 
+  useEffect(() => {
+    const emoteId =
+      celebration?.emoteId && EMOTES.some((emote) => emote.id === celebration.emoteId)
+        ? (celebration.emoteId as EmoteId)
+        : null;
+
+    if (emoteId) {
+      setActiveEmote(emoteId);
+      setShowCelebration(true);
+      const timer = setTimeout(() => setShowCelebration(false), 5000);
+      return () => clearTimeout(timer);
+    }
+
+    setShowCelebration(false);
+  }, [celebration?.emoteId, celebration?.triggeredAt]);
+
   // For solo/practice mode, use the first player ID if userId doesn't match
   const isSolo = match.mode === "solo";
   const actualPlayerId = isSolo && !match.players[userId] 
@@ -78,6 +130,10 @@ export function MatchResults({ match, userId, onPlayAgain, aiFeedback }: MatchRe
   const player = match.players[actualPlayerId];
   const opponentId = match.playerIds.find((id) => id !== actualPlayerId);
   const opponent = opponentId ? match.players[opponentId] : null;
+  const celebrationEmote = useMemo(
+    () => (activeEmote ? EMOTES.find((emote) => emote.id === activeEmote) ?? null : null),
+    [activeEmote],
+  );
 
   if (!player) {
     console.warn("MatchResults: No player found", { userId, actualPlayerId, playerIds: match.playerIds, players: Object.keys(match.players) });
@@ -99,7 +155,9 @@ export function MatchResults({ match, userId, onPlayAgain, aiFeedback }: MatchRe
       player,
     });
   }
-  
+
+  let playerWon = false;
+  let isDraw = false;
   let result: string;
   let resultColor: string;
   let bgColor: string;
@@ -126,9 +184,9 @@ export function MatchResults({ match, userId, onPlayAgain, aiFeedback }: MatchRe
     // Ranked mode: Show win/loss
     if (!opponent) return null;
     
-    const playerWon = player.correctCount > opponent.correctCount ||
+    playerWon = player.correctCount > opponent.correctCount ||
       (player.correctCount === opponent.correctCount && player.totalTimeMs < opponent.totalTimeMs);
-    const isDraw = player.correctCount === opponent.correctCount && 
+    isDraw = player.correctCount === opponent.correctCount && 
       Math.abs(player.totalTimeMs - opponent.totalTimeMs) <= 100;
 
     result = isDraw ? "Draw" : playerWon ? "Victory!" : "Defeat";
@@ -136,8 +194,69 @@ export function MatchResults({ match, userId, onPlayAgain, aiFeedback }: MatchRe
     bgColor = isDraw ? "bg-yellow-50" : playerWon ? "bg-green-50" : "bg-red-50";
   }
 
+  const matchWinnerId = match.winner ?? null;
+  const canTriggerEmote = !isSolo && !isDraw && matchWinnerId === actualPlayerId;
+  const celebrationButtonDisabled = !canTriggerEmote || isSendingEmote;
+
+  const handleOpenEmoteDialog = useCallback(() => {
+    if (!canTriggerEmote) return;
+    setEmoteError(null);
+    setIsEmoteDialogOpen(true);
+  }, [canTriggerEmote]);
+
+  const handleCloseEmoteDialog = useCallback(() => {
+    if (isSendingEmote) return;
+    setIsEmoteDialogOpen(false);
+    setEmoteError(null);
+  }, [isSendingEmote]);
+
+  const handleSendEmote = useCallback(
+    async (emoteId: EmoteId) => {
+      if (!canTriggerEmote) return;
+      setIsSendingEmote(true);
+      setEmoteError(null);
+      const previousEmote = activeEmote;
+      const previousVisibility = showCelebration;
+
+      setActiveEmote(emoteId);
+      setShowCelebration(true);
+      try {
+        await triggerMatchEmote({ matchId: match.id, emoteId });
+        setIsEmoteDialogOpen(false);
+      } catch (error) {
+        console.error("Failed to trigger emote", error);
+        const message =
+          error instanceof Error ? error.message : "Failed to send emote. Please try again.";
+        setEmoteError(message);
+        setActiveEmote(previousEmote ?? initialEmote);
+        setShowCelebration(previousVisibility);
+      } finally {
+        setIsSendingEmote(false);
+      }
+    },
+    [canTriggerEmote, match.id, activeEmote, showCelebration, initialEmote],
+  );
+
   return (
     <div className="space-y-6">
+      {showCelebration && celebrationEmote && (
+        <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-3 rounded-3xl bg-black/55 px-6 py-4 shadow-[0_20px_60px_rgba(0,0,0,0.45)] backdrop-blur-sm">
+              <Image
+                src={celebrationEmote.src}
+              alt=""
+                width={320}
+                height={320}
+                unoptimized
+                className="max-h-[60vh] w-auto rounded-2xl object-contain"
+              />
+            <p className="sr-only">
+              {celebrationEmote.label}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Result Header */}
       <div className={`rounded-2xl ${bgColor} p-8 text-center`}>
         <h2 className={`text-4xl font-bold ${resultColor} mb-4`}>{result}</h2>
@@ -257,6 +376,17 @@ export function MatchResults({ match, userId, onPlayAgain, aiFeedback }: MatchRe
         <Button size="lg" onClick={onPlayAgain}>
           Play Again
         </Button>
+        {!isSolo && (
+          <Button
+            size="lg"
+            variant="secondary"
+            onClick={handleOpenEmoteDialog}
+            disabled={celebrationButtonDisabled}
+            title={canTriggerEmote ? "Celebrate your win with a global emote" : "Only the winner can trigger a victory emote"}
+          >
+            {isSendingEmote ? "Sending..." : "Celebrate"}
+          </Button>
+        )}
         <Button size="lg" variant="outline" asChild>
           <Link href="/social">
             View Social
@@ -268,6 +398,47 @@ export function MatchResults({ match, userId, onPlayAgain, aiFeedback }: MatchRe
           </Link>
         </Button>
       </div>
+
+      <Dialog open={isEmoteDialogOpen} onClose={handleCloseEmoteDialog} title="Victory Emotes">
+        <div className="space-y-4">
+          <p className="text-sm text-ink-soft">
+            Choose a celebratory emote to display on both screens. Emotes are limited to match winners.
+          </p>
+          {emoteError && (
+            <p className="rounded-lg bg-red-50 px-4 py-2 text-sm text-red-600">
+              {emoteError}
+            </p>
+          )}
+              <div className="grid gap-4 sm:grid-cols-2">
+                {EMOTES.map((emote) => (
+                  <button
+                    key={emote.id}
+                    type="button"
+                    onClick={() => handleSendEmote(emote.id)}
+                disabled={isSendingEmote}
+                className="group relative overflow-hidden rounded-2xl border border-border bg-surface-muted p-3 transition hover:-translate-y-1 hover:border-brand hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-brand"
+                >
+                  <div className="flex flex-col items-center gap-2">
+                    <Image
+                      src={emote.src}
+                    alt=""
+                      width={180}
+                      height={180}
+                      unoptimized
+                      className="h-32 w-auto rounded-xl object-contain"
+                    />
+                    <span className="sr-only">{emote.label}</span>
+                  </div>
+                </button>
+            ))}
+          </div>
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={handleCloseEmoteDialog} disabled={isSendingEmote}>
+              Close
+            </Button>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }

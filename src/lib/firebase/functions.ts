@@ -140,6 +140,40 @@ export interface AcceptFriendInviteResponse {
 export const acceptFriendInvite: HttpsCallable<AcceptFriendInviteParams, AcceptFriendInviteResponse> =
   httpsCallable(functions, 'acceptFriendInvite');
 
+export interface SendFriendRequestParams {
+  targetUid: string;
+}
+
+export interface SendFriendRequestResponse {
+  success: boolean;
+  requestCreated?: boolean;
+  alreadyPending?: boolean;
+  alreadyFriends?: boolean;
+  autoAccepted?: boolean;
+}
+
+/**
+ * Initiate a friend request to another player
+ */
+export const sendFriendRequest: HttpsCallable<SendFriendRequestParams, SendFriendRequestResponse> =
+  httpsCallable(functions, 'sendFriendRequest');
+
+export interface TriggerMatchEmoteParams {
+  matchId: string;
+  emoteId: string;
+}
+
+export interface TriggerMatchEmoteResponse {
+  success: boolean;
+  emoteId: string;
+}
+
+/**
+ * Trigger a post-match celebration emote
+ */
+export const triggerMatchEmote: HttpsCallable<TriggerMatchEmoteParams, TriggerMatchEmoteResponse> =
+  httpsCallable(functions, 'triggerMatchEmote');
+
 export interface WritingModeSubmission {
   pageNumber: number;
   imageBase64: string;

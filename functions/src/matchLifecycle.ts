@@ -82,6 +82,7 @@ export async function createMatch({
       updatedAt: Timestamp.now(),
       startedAt: startAt,
       seed,
+      activeRoundId: "1",
     };
 
     tx.set(matchRef, matchDoc);
@@ -97,6 +98,21 @@ export async function createMatch({
       createdBy: "generator:v1",
       roundIndex: 1,
     });
+
+    for (let roundIndex = 2; roundIndex <= resolvedSettings.rounds; roundIndex += 1) {
+      const generated = generateDeterministicRound(seed, roundIndex, category);
+      tx.set(matchRef.collection("rounds").doc(String(roundIndex)), {
+        status: "pending",
+        prompt: generated.prompt,
+        canonical: generated.canonical,
+        answerHash: generated.answerHash,
+        startAt: null,
+        endsAt: null,
+        difficulty: generated.difficulty,
+        createdBy: "generator:v1",
+        roundIndex,
+      });
+    }
   });
 
   logger.info(

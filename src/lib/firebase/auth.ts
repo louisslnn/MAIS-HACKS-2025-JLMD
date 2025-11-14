@@ -20,6 +20,40 @@ import {
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, firestore } from './client';
 
+function buildSearchPrefixes(name: string, maxPrefixes = 50): string[] {
+  const normalized = name.toLowerCase().trim();
+  if (!normalized) {
+    return [];
+  }
+
+  const prefixes = new Set<string>();
+  const words = normalized.split(/\s+/).filter(Boolean);
+
+  for (const word of words) {
+    let current = '';
+    for (const char of word) {
+      current += char;
+      prefixes.add(current);
+    }
+  }
+
+  let running = '';
+  for (const char of normalized) {
+    if (char === ' ') {
+      running = '';
+      continue;
+    }
+    running += char;
+    prefixes.add(running);
+  }
+
+  prefixes.add(normalized);
+
+  return Array.from(prefixes)
+    .filter(Boolean)
+    .slice(0, maxPrefixes);
+}
+
 /**
  * Sign in with email and password
  */
@@ -74,10 +108,14 @@ export function onAuthStateChange(callback: (user: User | null) => void): () => 
  */
 async function createUserDocument(user: User, displayName?: string): Promise<void> {
   const userRef = doc(firestore, 'users', user.uid);
+  const rawName = (displayName || user.displayName || 'Anonymous').trim();
+  const resolvedName = rawName.length > 0 ? rawName : 'Anonymous';
+  const searchPrefixes = buildSearchPrefixes(resolvedName);
   
   await setDoc(userRef, {
     uid: user.uid,
-    displayName: displayName || user.displayName || 'Anonymous',
+    displayName: resolvedName,
+    displayNameLower: resolvedName.toLowerCase(),
     email: user.email || '',
     rating: 1000, // Chess.com-style starting rating
     stats: {
@@ -90,6 +128,7 @@ async function createUserDocument(user: User, displayName?: string): Promise<voi
     },
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
+    searchPrefixes,
   });
 }
 
@@ -118,15 +157,20 @@ export async function resetPassword(email: string): Promise<void> {
 export async function updateUserProfile(displayName: string): Promise<void> {
   const user = auth.currentUser;
   if (!user) throw new Error('No user signed in');
+  const rawName = displayName.trim();
+  const resolvedName = rawName.length > 0 ? rawName : 'Anonymous';
+  const searchPrefixes = buildSearchPrefixes(resolvedName);
   
   // Update Firebase Auth profile
-  await firebaseUpdateProfile(user, { displayName });
+  await firebaseUpdateProfile(user, { displayName: resolvedName });
   
   // Update Firestore user document
   const userRef = doc(firestore, 'users', user.uid);
   await updateDoc(userRef, {
-    displayName,
+    displayName: resolvedName,
+    displayNameLower: resolvedName.toLowerCase(),
     updatedAt: serverTimestamp(),
+    searchPrefixes,
   });
 }
 
@@ -166,4 +210,3 @@ export async function updateUserPassword(currentPassword: string, newPassword: s
   // Update password
   await firebaseUpdatePassword(user, newPassword);
 }
-

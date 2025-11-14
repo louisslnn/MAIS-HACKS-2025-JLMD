@@ -1,6 +1,6 @@
 import { Timestamp } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
-import { onCall, HttpsError } from "firebase-functions/v2/https";
+import * as functions from "firebase-functions/v1";
 import { z } from "zod";
 
 import { db, collections, serverTimestamp } from "./config";
@@ -15,35 +15,35 @@ const forfeitSchema = z.object({
  * Allow a player to forfeit/quit a match
  * Sets their surrendered flag and ends the match
  */
-export const forfeitMatch = onCall(
-  { enforceAppCheck: false, region: "us-central1" },
-  async (request) => {
+export const forfeitMatch = functions
+  .region("us-central1")
+  .https.onCall(async (data, context) => {
     try {
-      if (!request.auth) {
-        throw new HttpsError("unauthenticated", "Sign in to forfeit.");
+      if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "Sign in to forfeit.");
       }
 
-      const payload = forfeitSchema.safeParse(request.data);
+      const payload = forfeitSchema.safeParse(data);
       if (!payload.success) {
-        throw new HttpsError("invalid-argument", "Invalid forfeit payload.");
+        throw new functions.https.HttpsError("invalid-argument", "Invalid forfeit payload.");
       }
 
       const { matchId } = payload.data;
-      const uid = request.auth.uid;
+      const uid = context.auth.uid;
 
       const matchRef = db.collection(collections.matches).doc(matchId);
 
       await db.runTransaction(async (tx) => {
         const matchSnap = await tx.get(matchRef);
         if (!matchSnap.exists) {
-          throw new HttpsError("not-found", "Match not found.");
+          throw new functions.https.HttpsError("not-found", "Match not found.");
         }
 
         const match = matchSnap.data() as MatchDocument;
 
         // Verify player is a participant
         if (!match.playerIds.includes(uid)) {
-          throw new HttpsError(
+          throw new functions.https.HttpsError(
             "permission-denied",
             "You are not a participant in this match.",
           );
@@ -51,7 +51,7 @@ export const forfeitMatch = onCall(
 
         // Can only forfeit active matches
         if (match.status !== "active") {
-          throw new HttpsError(
+          throw new functions.https.HttpsError(
             "failed-precondition",
             "Match is not active. Cannot forfeit.",
           );
@@ -85,21 +85,19 @@ export const forfeitMatch = onCall(
     } catch (error) {
       logger.error("Forfeit error", {
         error: error instanceof Error ? error.message : String(error),
-        matchId: request.data?.matchId,
-        uid: request.auth?.uid,
+        matchId: data?.matchId,
+        uid: context.auth?.uid,
       });
 
-      if (error instanceof HttpsError) {
+      if (error instanceof functions.https.HttpsError) {
         throw error;
       }
 
-      throw new HttpsError(
+      throw new functions.https.HttpsError(
         "internal",
         error instanceof Error
           ? error.message
           : "An error occurred while forfeiting.",
       );
     }
-  },
-);
-
+  });

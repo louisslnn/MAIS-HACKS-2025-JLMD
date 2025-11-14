@@ -182,6 +182,12 @@ export function MatchProvider({ children }: { children: React.ReactNode }) {
           }
 
           const data = snapshot.data();
+          const celebration = data?.celebration
+            ? {
+                ...data.celebration,
+                triggeredAt: convertTimestamp(data.celebration.triggeredAt),
+              }
+            : undefined;
           const nextMatch: MatchDocument = {
             id: snapshot.id,
             ...(data as Omit<MatchDocument, "id">),
@@ -190,6 +196,7 @@ export function MatchProvider({ children }: { children: React.ReactNode }) {
             endsAt: convertTimestamp(data?.endsAt),
             createdAt: convertTimestamp(data?.createdAt),
             updatedAt: convertTimestamp(data?.updatedAt),
+            celebration,
           };
 
           setState((prev) => ({
@@ -466,9 +473,14 @@ export function MatchProvider({ children }: { children: React.ReactNode }) {
     
     setState((prev) => {
       if (!prev.match || !prev.match.id.startsWith("practice-")) return prev;
-      
+      const playerId = prev.match.playerIds[0];
+      const player = prev.match.players[playerId];
+      if (!player) return prev;
+
       const currentRound = prev.rounds.find(r => r.id === roundId);
       if (!currentRound) return prev;
+      const currentIndex = prev.rounds.findIndex(r => r.id === roundId);
+      if (currentIndex === -1) return prev;
       
       // For writing mode OCR, allow submitting even if round isn't active yet
       // Otherwise, require active status
@@ -487,8 +499,7 @@ export function MatchProvider({ children }: { children: React.ReactNode }) {
       }
       
       const now = Date.now();
-      // For OCR mode, rounds might not have startAt, use a default time
-      const roundStart = currentRound.startAt ? new Date(currentRound.startAt).getTime() : now - 5000;
+      const roundStart = currentRound.startAt ? new Date(currentRound.startAt).getTime() : now;
       const timeMs = Math.max(0, now - roundStart);
       const inTime = timeMs <= DEFAULT_ROUND_DURATION_MS;
       
@@ -498,7 +509,7 @@ export function MatchProvider({ children }: { children: React.ReactNode }) {
       
       // Create answer document
       const answerDoc: AnswerDocument = {
-        uid: prev.match.playerIds[0], // Solo player ID
+        uid: playerId, // Solo player ID
         value: String(value),
         submittedAt: new Date().toISOString(),
         timeMs,
@@ -509,31 +520,41 @@ export function MatchProvider({ children }: { children: React.ReactNode }) {
       // Update answers
       const newAnswers = { ...prev.answers };
       const roundAnswers = newAnswers[roundId] || [];
-      newAnswers[roundId] = [...roundAnswers, answerDoc];
+      const existingAnswer = roundAnswers.find((answer) => answer.uid === playerId);
+      const filteredAnswers = roundAnswers.filter((answer) => answer.uid !== playerId);
+      newAnswers[roundId] = [...filteredAnswers, answerDoc];
       
-      // Update player stats
-      const playerId = prev.match.playerIds[0];
-      const player = prev.match.players[playerId];
+      // Update player stats without double-counting prior submissions
+      const previousCorrectContribution = existingAnswer?.correct ? 1 : 0;
+      const previousScoreContribution = existingAnswer?.correct ? 10 : 0;
+      const previousTimeContribution = existingAnswer?.timeMs ?? 0;
       const updatedPlayer = {
         ...player,
-        correctCount: player.correctCount + (actuallyCorrect ? 1 : 0),
-        totalTimeMs: player.totalTimeMs + timeMs,
-        score: player.score + (actuallyCorrect ? 10 : 0),
+        correctCount: player.correctCount - previousCorrectContribution + (actuallyCorrect ? 1 : 0),
+        totalTimeMs: Math.max(0, player.totalTimeMs - previousTimeContribution + timeMs),
+        score: player.score - previousScoreContribution + (actuallyCorrect ? 10 : 0),
       };
       
       // Lock current round and activate next round
       // For OCR mode, we might be submitting answers out of order, so lock this round
+      const roundDurationMs = prev.match.settings?.roundDurationMs ?? DEFAULT_ROUND_DURATION_MS;
+      const completedAtIso = new Date(now).toISOString();
       const updatedRounds = prev.rounds.map((round, index) => {
         if (round.id === roundId) {
           // Lock this round
-          return { ...round, status: "locked" as const };
+          return { ...round, status: "locked" as const, endsAt: completedAtIso };
         }
         // Only activate next round if we're in normal mode (not OCR batch mode)
         // In OCR mode, we submit all at once so don't activate next rounds
         if (isCorrect === undefined) {
-          const currentIndex = prev.rounds.findIndex(r => r.id === roundId);
           if (index === currentIndex + 1 && round.status === "pending") {
-            return { ...round, status: "active" as const };
+            const activatedAt = completedAtIso;
+            return {
+              ...round,
+              status: "active" as const,
+              startAt: activatedAt,
+              endsAt: new Date(now + roundDurationMs).toISOString(),
+            };
           }
         }
         return round;

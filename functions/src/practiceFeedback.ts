@@ -1,4 +1,4 @@
-import * as functions from "firebase-functions";
+import * as functions from "firebase-functions/v1";
 import OpenAI from "openai";
 
 interface ProblemResult {
@@ -37,11 +37,13 @@ const getOpenAIClient = () => {
 /**
  * Cloud Function to generate personalized feedback for practice sessions using GPT-4.1 mini
  */
-export const generatePracticeFeedback = functions.https.onCall(
-  async (
-    data: GenerateFeedbackRequest,
-    context: functions.https.CallableContext
-  ): Promise<GenerateFeedbackResponse> => {
+export const generatePracticeFeedback = functions
+  .runWith({
+    secrets: ["OPENAI_API_KEY"],
+    timeoutSeconds: 60,
+    memory: "256MB",
+  })
+  .https.onCall(async (data, context) => {
     // Verify authentication
     if (!context.auth) {
       throw new functions.https.HttpsError(
@@ -124,4 +126,3 @@ Be warm and supportive. Use simple, natural language. No bullet points.`;
     }
   }
 );
-

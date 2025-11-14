@@ -81,3 +81,7 @@ If still errors:
 
 **Check index**: https://console.firebase.google.com/project/mathclash-3e565/firestore/indexes
 
+
+
+
+

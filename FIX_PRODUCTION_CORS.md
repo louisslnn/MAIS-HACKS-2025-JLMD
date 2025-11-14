@@ -80,3 +80,7 @@ https://console.firebase.google.com/project/mathclash-3e565/functions/logs
 
 **Status**: Index deploying, functions deployed. Wait 1-2 minutes then test! 🚀
 
+
+
+
+

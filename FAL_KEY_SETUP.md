@@ -71,3 +71,7 @@ If you get "FAL_KEY is not configured" error:
 2. Deploy the functions again
 3. Check logs: `firebase functions:log`
 
+
+
+
+

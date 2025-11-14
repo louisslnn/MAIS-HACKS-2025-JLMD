@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 import { Button } from "@/components/ui";
 import { useMatch } from "@/contexts/match-context";
@@ -45,6 +45,8 @@ export default function PlayPage() {
   const [problemCategory, setProblemCategory] = useState<ProblemCategory>("addition");
   const [writingMode, setWritingMode] = useState<boolean>(false);
   const { state, startLocalMatch, requestMatch, matchmakingStatus, matchmakingError, cancelMatchmaking, quitMatch } = useMatch();
+  const [quickParam, setQuickParam] = useState<string | null>(null);
+  const [quickMatchRequested, setQuickMatchRequested] = useState(false);
 
   const handlePlay = async () => {
     if (!user) {
@@ -58,10 +60,28 @@ export default function PlayPage() {
     }
   };
 
-  const activeRound =
-    state.rounds.find((round) => round.status === "active") ?? state.rounds[0];
+  const activeRoundId = state.match?.activeRoundId;
+  const activeRound = activeRoundId
+    ? state.rounds.find((round) => round.id === activeRoundId)
+    : state.rounds.find((round) => round.status === "active");
+  const hasActiveMatch = useMemo(() => {
+    if (!state.match || state.match.status !== "active") {
+      return false;
+    }
+
+    if (state.match.mode === "solo") {
+      return true;
+    }
+
+    return !state.match.id?.startsWith("mock-") && !state.match.id?.startsWith("ranked-demo-");
+  }, [state.match]);
 
   const isMatchCompleted = state.match?.status === "completed";
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    setQuickParam(params.get("quick"));
+  }, []);
   
   // Debug logging for match status
   useEffect(() => {
@@ -69,6 +89,28 @@ export default function PlayPage() {
       console.log("[PlayPage] Match status:", state.match.status, "isMatchCompleted:", isMatchCompleted);
     }
   }, [state.match?.status, isMatchCompleted, state.match]);
+
+  useEffect(() => {
+    if (quickParam && selected !== "ranked") {
+      setSelected("ranked");
+    }
+  }, [quickParam, selected]);
+
+  useEffect(() => {
+    if (!user) return;
+    if (!quickParam || (quickParam !== "1" && quickParam.toLowerCase() !== "true")) return;
+    if (quickMatchRequested) return;
+    if (matchmakingStatus !== "idle") return;
+    if (hasActiveMatch) return;
+
+    (async () => {
+      try {
+        await requestMatch(problemCategory);
+      } finally {
+        setQuickMatchRequested(true);
+      }
+    })();
+  }, [user, quickParam, quickMatchRequested, matchmakingStatus, hasActiveMatch, requestMatch, problemCategory]);
 
   const handlePlayAgain = async () => {
     // Reset to mode selection by clearing active match
@@ -138,13 +180,6 @@ export default function PlayPage() {
   }
 
   // Check if we have an active match (include practice mode)
-  const hasActiveMatch = state.match && 
-    state.match.status === "active" &&
-    // Include practice mode, exclude only demo/mock matches
-    (state.match.mode === "solo" || 
-     (!state.match.id?.startsWith("mock-") && 
-      !state.match.id?.startsWith("ranked-demo-")));
-
   // Show matchmaking lobby (only if not found yet and no active match)
   if (matchmakingStatus === "searching" && !hasActiveMatch) {
     return (
@@ -260,10 +295,7 @@ export default function PlayPage() {
             <div className="mb-8 p-6 rounded-2xl bg-surface border border-border">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-lg font-semibold text-ink mb-1">📝 Writing Mode</h3>
-                  <p className="text-sm text-ink-soft">
-                    Write your answers by hand and we&apos;ll use AI to check them
-                  </p>
+                  <h3 className="text-lg font-semibold text-ink">📝 Writing Mode</h3>
                 </div>
                 <button
                   type="button"
@@ -328,13 +360,7 @@ export default function PlayPage() {
         {/* Match Header */}
         <div className="mb-8 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-brand flex items-center justify-center text-white font-bold">
-              MC
-            </div>
             <div>
-              <p className="font-semibold text-ink">
-                {state.match.mode === "solo" ? "Practice Session" : "Ranked Match"}
-              </p>
               <p className="text-xs text-ink-soft">Match ID: {state.match.id.slice(0, 8)}</p>
             </div>
           </div>

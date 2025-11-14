@@ -269,3 +269,7 @@ For issues, check:
 - Function execution logs: `firebase functions:log`
 - Firestore/RTDB rules debugger in console
 
+
+
+
+

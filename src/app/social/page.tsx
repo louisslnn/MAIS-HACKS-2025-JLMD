@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, useCallback, Suspense, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   collection,
@@ -13,9 +13,14 @@ import {
   where,
   getDocs,
   getDoc,
+  startAt,
+  endAt,
+  updateDoc,
+  type QueryDocumentSnapshot,
+  type DocumentData,
 } from "firebase/firestore";
 import { firestore } from "@/lib/firebase/client";
-import { acceptFriendInvite } from "@/lib/firebase/functions";
+import { acceptFriendInvite, sendFriendRequest } from "@/lib/firebase/functions";
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
   Badge,
@@ -26,8 +31,9 @@ import {
   CardHeader,
   CardTitle,
   Dialog,
+  Input,
 } from "@/components/ui";
-import { X, Copy, Check, Trophy, Users, Star } from "lucide-react";
+import { X, Copy, Check, Trophy, Users, Star, Bell, Search, UserPlus, Loader2 } from "lucide-react";
 
 interface LeaderboardEntry {
   uid: string;
@@ -49,6 +55,48 @@ interface Friend {
   addedAt: Date;
 }
 
+interface FriendRequest {
+  senderUid: string;
+  senderDisplayName: string;
+  senderRating: number;
+  senderPhotoURL: string | null;
+  createdAt: Date;
+  read: boolean;
+}
+
+interface PlayerSearchResult {
+  uid: string;
+  displayName: string;
+  rating: number;
+  isFriend: boolean;
+  requestPending: boolean;
+  incomingRequest: boolean;
+}
+
+interface RankTier {
+  label: string;
+  colorClass: string;
+}
+
+function computeRankTier(rank: number, totalPlayers: number): RankTier | null {
+  if (!totalPlayers || rank < 1) {
+    return null;
+  }
+
+  const gmCutoff = Math.max(1, Math.floor(totalPlayers * 0.01)); // Top 1%
+  const masterCutoff = Math.max(gmCutoff + 1, Math.floor(totalPlayers * 0.05)); // Top 5%
+
+  if (rank <= gmCutoff) {
+    return { label: "GM", colorClass: "bg-purple-600 text-white" };
+  }
+
+  if (rank <= masterCutoff) {
+    return { label: "Master", colorClass: "bg-brand-secondary/20 text-brand-secondary" };
+  }
+
+  return null;
+}
+
 function SocialPageContent() {
   const { user } = useAuth();
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -65,9 +113,30 @@ function SocialPageContent() {
   } | null>(null);
   const [inviteActionError, setInviteActionError] = useState<string | null>(null);
   const [isAcceptingInvite, setIsAcceptingInvite] = useState(false);
+  const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchResults, setSearchResults] = useState<PlayerSearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [requestActionError, setRequestActionError] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<{ uid: string; type: "send" | "accept" | "decline" } | null>(null);
+  const [pendingOutgoingRequests, setPendingOutgoingRequests] = useState<Set<string>>(new Set());
   const router = useRouter();
   const searchParams = useSearchParams();
   const inviteUidParam = searchParams.get("invite");
+  const notificationsAnchorRef = useRef<HTMLDivElement | null>(null);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const friendsSet = useMemo(() => new Set(friends.map((friend) => friend.uid)), [friends]);
+  const incomingRequestSet = useMemo(
+    () => new Set(friendRequests.map((request) => request.senderUid)),
+    [friendRequests],
+  );
+  const unreadRequestCount = useMemo(
+    () => friendRequests.filter((request) => !request.read).length,
+    [friendRequests],
+  );
+  const hasSearchTerm = searchTerm.trim().length > 0;
 
   // Generate invite link
   useEffect(() => {
@@ -76,6 +145,48 @@ function SocialPageContent() {
       setInviteLink(link);
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!notificationsOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        notificationsAnchorRef.current &&
+        !notificationsAnchorRef.current.contains(event.target as Node)
+      ) {
+        setNotificationsOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [notificationsOpen]);
+
+  useEffect(() => {
+    if (!notificationsOpen) {
+      setRequestActionError(null);
+    }
+  }, [notificationsOpen]);
+
+  useEffect(() => {
+    if (!notificationsOpen || !user || !firestore) return;
+    if (friendRequests.length === 0) return;
+
+    const unread = friendRequests.filter((request) => !request.read);
+    if (unread.length === 0) return;
+
+    unread.forEach((request) => {
+      const requestRef = doc(
+        firestore,
+        `users/${user.uid}/friendRequests/${request.senderUid}`,
+      );
+      updateDoc(requestRef, { read: true }).catch((error) => {
+        console.error("Failed to mark friend request as read:", error);
+      });
+    });
+  }, [notificationsOpen, friendRequests, user]);
 
   // Subscribe to global leaderboard
   useEffect(() => {
@@ -146,6 +257,47 @@ function SocialPageContent() {
       
       setFriends(friendsList);
     });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  // Subscribe to incoming friend requests
+  useEffect(() => {
+    if (!firestore || !user) return;
+
+    const requestsRef = collection(firestore, `users/${user.uid}/friendRequests`);
+    const requestsQuery = query(requestsRef, orderBy("createdAt", "desc"), limit(20));
+
+    const unsubscribe = onSnapshot(
+      requestsQuery,
+      (snapshot) => {
+        const requests: FriendRequest[] = snapshot.docs.map((docSnap) => {
+          const data = docSnap.data();
+          let createdAt: Date = new Date();
+          const rawCreatedAt = data.createdAt;
+          if (rawCreatedAt && typeof rawCreatedAt === "object") {
+            if (typeof rawCreatedAt.toDate === "function") {
+              createdAt = rawCreatedAt.toDate();
+            } else if (typeof rawCreatedAt.seconds === "number") {
+              createdAt = new Date(rawCreatedAt.seconds * 1000);
+            }
+          }
+
+          return {
+            senderUid: docSnap.id,
+            senderDisplayName: data.senderDisplayName || "Anonymous",
+            senderRating: data.senderRating || 1000,
+            senderPhotoURL: data.senderPhotoURL ?? null,
+            createdAt,
+            read: Boolean(data.read),
+          };
+        });
+        setFriendRequests(requests);
+      },
+      (error) => {
+        console.error("Friend requests subscription error:", error);
+      },
+    );
 
     return () => unsubscribe();
   }, [user]);
@@ -236,6 +388,160 @@ function SocialPageContent() {
     };
   }, [user, firestore, inviteUidParam]);
 
+  useEffect(() => {
+    if (!firestore || !user) return;
+
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+      searchDebounceRef.current = null;
+    }
+
+    const trimmedRaw = searchTerm.trim();
+    if (!trimmedRaw) {
+      setIsSearching(false);
+      setSearchError(null);
+      setSearchResults([]);
+      return;
+    }
+
+    const normalizedTerm = trimmedRaw.toLowerCase();
+    setIsSearching(true);
+    setSearchError(null);
+
+    searchDebounceRef.current = setTimeout(async () => {
+      try {
+        const usersRef = collection(firestore, "users");
+        const aggregated = new Map<string, PlayerSearchResult>();
+
+        const primaryQuery = query(
+          usersRef,
+          where("searchPrefixes", "array-contains", normalizedTerm),
+          limit(10),
+        );
+
+        let snapshots: QueryDocumentSnapshot<DocumentData>[] = [];
+        try {
+          const primarySnapshot = await getDocs(primaryQuery);
+          snapshots = primarySnapshot.docs;
+        } catch (error) {
+          console.error("Prefix search query failed:", error);
+        }
+
+        if (snapshots.length === 0) {
+          try {
+            const fallbackSnapshot = await getDocs(
+              query(
+                usersRef,
+                orderBy("displayNameLower"),
+                startAt(normalizedTerm),
+                endAt(`${normalizedTerm}\uf8ff`),
+                limit(10),
+              ),
+            );
+            snapshots = fallbackSnapshot.docs;
+          } catch (fallbackError) {
+            console.error("Fallback search query failed:", fallbackError);
+          }
+        }
+
+        await Promise.all(
+          snapshots
+            .filter((docSnap) => docSnap.id !== user.uid)
+            .map(async (docSnap) => {
+              if (aggregated.has(docSnap.id)) return;
+              const data = docSnap.data();
+              const nameLower =
+                typeof data.displayNameLower === "string"
+                  ? data.displayNameLower
+                  : (data.displayName || "").toLowerCase();
+
+              if (nameLower && !nameLower.includes(normalizedTerm)) {
+                // Ensure fallback results still match the search
+                return;
+              }
+
+              const targetUid = docSnap.id;
+              const isFriend = friendsSet.has(targetUid);
+              const incomingRequest = incomingRequestSet.has(targetUid);
+              let requestPending = pendingOutgoingRequests.has(targetUid);
+
+              if (!requestPending && !isFriend) {
+                try {
+                  const targetRequestSnap = await getDoc(
+                    doc(firestore, `users/${targetUid}/friendRequests/${user.uid}`),
+                  );
+                  requestPending = targetRequestSnap.exists();
+                  if (requestPending) {
+                    setPendingOutgoingRequests((prev) => {
+                      if (prev.has(targetUid)) {
+                        return prev;
+                      }
+                      const next = new Set(prev);
+                      next.add(targetUid);
+                      return next;
+                    });
+                  }
+                } catch (error) {
+                  console.error("Failed to check existing friend request:", error);
+                }
+              }
+
+              aggregated.set(targetUid, {
+                uid: targetUid,
+                displayName: data.displayName || "Anonymous",
+                rating: data.rating || 1000,
+                isFriend,
+                requestPending,
+                incomingRequest,
+              });
+            }),
+        );
+
+        if (leaderboard.length > 0) {
+          leaderboard.forEach((entry) => {
+            if (aggregated.has(entry.uid)) {
+              return;
+            }
+            const displayName = entry.displayName || "";
+            const lowerName = displayName.toLowerCase();
+            if (!lowerName.includes(normalizedTerm)) {
+              return;
+            }
+
+            const targetUid = entry.uid;
+            const isFriend = friendsSet.has(targetUid);
+            const incomingRequest = incomingRequestSet.has(targetUid);
+            const requestPending = pendingOutgoingRequests.has(targetUid);
+
+            aggregated.set(targetUid, {
+              uid: targetUid,
+              displayName: displayName || "Anonymous",
+              rating: entry.rating || 1000,
+              isFriend,
+              requestPending,
+              incomingRequest,
+            });
+          });
+        }
+
+        setSearchResults(Array.from(aggregated.values()));
+      } catch (error) {
+        console.error("User search failed:", error);
+        setSearchError("We couldn't load players right now. Please try again shortly.");
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => {
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current);
+        searchDebounceRef.current = null;
+      }
+    };
+  }, [searchTerm, user, friendsSet, incomingRequestSet, pendingOutgoingRequests, firestore, leaderboard]);
+
   const handleDismissInvite = useCallback(() => {
     setInviteModalOpen(false);
     setPendingInvite(null);
@@ -285,13 +591,181 @@ function SocialPageContent() {
     }
   };
 
+  const handleSendFriendRequest = useCallback(
+    async (targetUid: string) => {
+      if (!user) {
+        setSearchError("You need to be signed in to send friend requests.");
+        return;
+      }
+
+      setPendingAction({ uid: targetUid, type: "send" });
+      setRequestActionError(null);
+      try {
+        const response = await sendFriendRequest({ targetUid });
+        const outcome = response.data;
+
+        if (!outcome?.success) {
+          throw new Error("Unable to send that friend request right now.");
+        }
+
+        setSearchError(null);
+
+        if (outcome.alreadyFriends || outcome.autoAccepted) {
+          setSearchResults((prev) =>
+            prev.map((result) =>
+              result.uid === targetUid
+                ? {
+                    ...result,
+                    isFriend: true,
+                    requestPending: false,
+                    incomingRequest: false,
+                  }
+                : result,
+            ),
+          );
+          setPendingOutgoingRequests((prev) => {
+            if (!prev.has(targetUid)) {
+              return prev;
+            }
+            const next = new Set(prev);
+            next.delete(targetUid);
+            return next;
+          });
+        } else {
+          setPendingOutgoingRequests((prev) => {
+            if (prev.has(targetUid)) return prev;
+            const next = new Set(prev);
+            next.add(targetUid);
+            return next;
+          });
+          setSearchResults((prev) =>
+            prev.map((result) =>
+              result.uid === targetUid
+                ? { ...result, requestPending: true }
+                : result,
+            ),
+          );
+        }
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "We couldn't send that friend request.";
+        setSearchError(message);
+      } finally {
+        setPendingAction(null);
+      }
+    },
+    [user, sendFriendRequest],
+  );
+
+  const handleAcceptFriendRequest = useCallback(
+    async (senderUid: string) => {
+      if (!user || !firestore) return;
+
+      setPendingAction({ uid: senderUid, type: "accept" });
+      setRequestActionError(null);
+      try {
+        await addFriend(senderUid);
+        const requestRef = doc(
+          firestore,
+          `users/${user.uid}/friendRequests/${senderUid}`,
+        );
+        await deleteDoc(requestRef).catch(() => {
+          // Already removed by backend - nothing to do.
+        });
+        setSearchResults((prev) =>
+          prev.map((result) =>
+            result.uid === senderUid
+              ? { ...result, isFriend: true, incomingRequest: false, requestPending: false }
+              : result,
+          ),
+        );
+        setPendingOutgoingRequests((prev) => {
+          if (!prev.has(senderUid)) {
+            return prev;
+          }
+          const next = new Set(prev);
+          next.delete(senderUid);
+          return next;
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "We couldn't accept that friend request.";
+        setRequestActionError(message);
+      } finally {
+        setPendingAction(null);
+      }
+    },
+    [user, firestore, addFriend],
+  );
+
+  const handleDeclineFriendRequest = useCallback(
+    async (senderUid: string) => {
+      if (!user || !firestore) return;
+
+      setPendingAction({ uid: senderUid, type: "decline" });
+      setRequestActionError(null);
+      try {
+        const requestRef = doc(
+          firestore,
+          `users/${user.uid}/friendRequests/${senderUid}`,
+        );
+        await deleteDoc(requestRef);
+        setSearchResults((prev) =>
+          prev.map((result) =>
+            result.uid === senderUid
+              ? { ...result, incomingRequest: false, requestPending: false }
+              : result,
+          ),
+        );
+        setPendingOutgoingRequests((prev) => {
+          if (!prev.has(senderUid)) {
+            return prev;
+          }
+          const next = new Set(prev);
+          next.delete(senderUid);
+          return next;
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "We couldn't decline that friend request.";
+        setRequestActionError(message);
+      } finally {
+        setPendingAction(null);
+      }
+    },
+    [user, firestore],
+  );
+
   const copyInviteLink = () => {
     navigator.clipboard.writeText(inviteLink);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const friendsLeaderboard = friends
+  const friendsLeaderboardSource = user ? [
+    ...friends,
+    {
+      uid: user.uid,
+      displayName: user.displayName || "You",
+      rating: leaderboard.find((entry) => entry.uid === user.uid)?.rating || 1000,
+      status: "online" as const,
+      addedAt: new Date(),
+    },
+  ] : friends;
+
+  const friendsLeaderboard = friendsLeaderboardSource
+    .reduce<Friend[]>((acc, entry) => {
+      if (!acc.some((item) => item.uid === entry.uid)) {
+        acc.push(entry);
+      }
+      return acc;
+    }, [])
     .sort((a, b) => b.rating - a.rating)
     .map((friend, index) => ({ ...friend, rank: index + 1 }));
 
@@ -375,12 +849,91 @@ function SocialPageContent() {
         )}
       </Dialog>
       <div className="space-y-8">
-      <header className="space-y-4">
-        <Badge variant="blue">Community Hub</Badge>
-        <h1 className="text-4xl font-bold">Connect, Compete, Conquer.</h1>
-        <p className="max-w-2xl text-lg text-ink-soft">
-          Challenge friends, track your progress, and climb the global rankings. Your journey to math mastery starts here.
-        </p>
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-2 text-center sm:text-left">
+          <h1 className="text-4xl font-bold">Connect, Compete, Conquer.</h1>
+          <p className="text-ink-soft">
+            Build your rival list and challenge friends head-to-head.
+          </p>
+        </div>
+        <div ref={notificationsAnchorRef} className="relative flex justify-end">
+          <Button
+            variant="subtle"
+            size="icon"
+            onClick={() => setNotificationsOpen((prev) => !prev)}
+            aria-label="Friend requests"
+          >
+            <Bell className="h-5 w-5" />
+          </Button>
+          {unreadRequestCount > 0 && (
+            <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-brand text-xs font-semibold text-white">
+              {unreadRequestCount > 9 ? "9+" : unreadRequestCount}
+            </span>
+          )}
+          {notificationsOpen && (
+            <div className="absolute right-0 z-20 mt-3 w-80 rounded-2xl border border-border bg-surface p-4 shadow-xl">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-sm font-semibold text-ink">Friend Requests</p>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setNotificationsOpen(false)}
+                  aria-label="Close friend requests"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              {requestActionError && (
+                <p className="mb-3 text-sm text-red-600">{requestActionError}</p>
+              )}
+              <div className="max-h-80 space-y-3 overflow-y-auto pr-1">
+                {friendRequests.length === 0 ? (
+                  <p className="text-sm text-ink-soft">No pending requests right now.</p>
+                ) : (
+                  friendRequests.map((request) => {
+                    const isProcessing = pendingAction?.uid === request.senderUid;
+                    return (
+                      <div
+                        key={request.senderUid}
+                        className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface-muted px-3 py-2"
+                      >
+                        <div>
+                          <p className="font-semibold text-ink">{request.senderDisplayName}</p>
+                          <p className="text-xs text-ink-soft">Rating {request.senderRating}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => handleAcceptFriendRequest(request.senderUid)}
+                            disabled={isProcessing}
+                          >
+                            {isProcessing && pendingAction?.type === "accept" ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              "Accept"
+                            )}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeclineFriendRequest(request.senderUid)}
+                            disabled={isProcessing}
+                          >
+                            {isProcessing && pendingAction?.type === "decline" ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              "Decline"
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </header>
 
       {/* Your Stats Card */}
@@ -428,7 +981,7 @@ function SocialPageContent() {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-6">
             {/* Invite Link */}
             <div className="p-4 bg-surface-muted rounded-lg border border-border">
               <p className="text-sm font-medium mb-2">Invite Friends</p>
@@ -457,6 +1010,137 @@ function SocialPageContent() {
                     </>
                   )}
                 </Button>
+              </div>
+            </div>
+
+            {/* Friend Search */}
+            <div className="p-4 border border-border rounded-lg bg-surface">
+              <p className="text-sm font-medium text-ink">Search Players</p>
+              <div className="relative mt-3">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-soft" />
+                <Input
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder="Search players by name"
+                  className="pl-10"
+                  aria-label="Search players"
+                />
+              </div>
+              {searchError && <p className="mt-2 text-sm text-red-600">{searchError}</p>}
+              <div className="mt-4 space-y-3">
+                {isSearching && (
+                  <div className="flex items-center gap-2 text-sm text-ink-soft">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Searching players…</span>
+                  </div>
+                )}
+                {!isSearching && hasSearchTerm && searchResults.length === 0 && !searchError && (
+                  <p className="text-sm text-ink-soft">No players match that name yet.</p>
+                )}
+                {!isSearching && searchResults.length > 0 && (
+                  <div className="space-y-3">
+                    {searchResults.map((result) => {
+                      const isSending =
+                        pendingAction?.uid === result.uid && pendingAction?.type === "send";
+                      if (result.isFriend) {
+                        return (
+                          <div
+                            key={result.uid}
+                            className="flex items-center justify-between rounded-xl border border-border bg-surface px-4 py-3"
+                          >
+                            <div>
+                              <p className="font-semibold text-ink">{result.displayName}</p>
+                              <p className="text-xs text-ink-soft">Rating {result.rating}</p>
+                            </div>
+                            <Badge variant="mint">Friends</Badge>
+                          </div>
+                        );
+                      }
+
+                      if (result.incomingRequest) {
+                        const isProcessing = pendingAction?.uid === result.uid;
+                        return (
+                          <div
+                            key={result.uid}
+                            className="flex items-center justify-between rounded-xl border border-brand/40 bg-brand/5 px-4 py-3"
+                          >
+                            <div>
+                              <p className="font-semibold text-ink">{result.displayName}</p>
+                              <p className="text-xs text-ink-soft">Sent you a friend request</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => handleAcceptFriendRequest(result.uid)}
+                                disabled={isProcessing}
+                              >
+                                {isProcessing && pendingAction?.type === "accept" ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  "Accept"
+                                )}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDeclineFriendRequest(result.uid)}
+                                disabled={isProcessing}
+                              >
+                                {isProcessing && pendingAction?.type === "decline" ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  "Decline"
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      if (result.requestPending) {
+                        return (
+                          <div
+                            key={result.uid}
+                            className="flex items-center justify-between rounded-xl border border-border bg-surface px-4 py-3"
+                          >
+                            <div>
+                              <p className="font-semibold text-ink">{result.displayName}</p>
+                              <p className="text-xs text-ink-soft">Rating {result.rating}</p>
+                            </div>
+                            <Badge variant="amber">Pending</Badge>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div
+                          key={result.uid}
+                          className="flex items-center justify-between rounded-xl border border-border bg-surface px-4 py-3"
+                        >
+                          <div>
+                            <p className="font-semibold text-ink">{result.displayName}</p>
+                            <p className="text-xs text-ink-soft">Rating {result.rating}</p>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => handleSendFriendRequest(result.uid)}
+                            disabled={isSending}
+                          >
+                            {isSending ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <>
+                                <UserPlus className="h-4 w-4" />
+                                Send request
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -490,7 +1174,7 @@ function SocialPageContent() {
                       <div>
                         <p className="font-semibold">{friend.displayName}</p>
                         <p className="text-sm text-ink-soft">
-                          {friend.rating} Elo • {friend.status === "in-match" ? "In Match" : friend.status === "online" ? "Online" : "Offline"}
+                          {friend.rating} Elo
                         </p>
                       </div>
                     </div>
@@ -602,6 +1286,7 @@ function SocialPageContent() {
                 <tbody className="divide-y divide-border bg-surface">
                   {topTenLeaderboard.map((player, index) => {
                     const isCurrentUser = user && player.uid === user.uid;
+                    const tier = computeRankTier(index + 1, leaderboard.length);
                     return (
                       <tr
                         key={player.uid}
@@ -633,14 +1318,24 @@ function SocialPageContent() {
                             <div className="h-8 w-8 rounded-full bg-gradient-to-br from-brand to-brand-secondary flex items-center justify-center text-white font-bold text-sm">
                               {player.displayName.charAt(0).toUpperCase()}
                             </div>
-                            <span className="font-medium">
-                              {player.displayName}
-                              {isCurrentUser && (
-                                <span className="ml-2 text-xs text-brand font-semibold">
-                                  (You)
-                                </span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">
+                                {player.displayName}
+                                {isCurrentUser && (
+                                  <span className="ml-2 text-xs text-brand font-semibold">
+                                    (You)
+                                  </span>
+                                )}
+                              </span>
+                              {tier && (
+                                <Badge
+                                  variant="slate"
+                                  className={`border border-transparent px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.25em] ${tier.colorClass}`}
+                                >
+                                  {tier.label}
+                                </Badge>
                               )}
-                            </span>
+                            </div>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -712,6 +1407,7 @@ function SocialPageContent() {
                 <tbody className="divide-y divide-border">
                   {leaderboard.map((player, index) => {
                     const isCurrentUser = user && player.uid === user.uid;
+                    const tier = computeRankTier(index + 1, leaderboard.length);
                     return (
                       <tr
                         key={player.uid}
@@ -741,14 +1437,24 @@ function SocialPageContent() {
                             <div className="h-8 w-8 rounded-full bg-gradient-to-br from-brand to-brand-secondary flex items-center justify-center text-white font-bold text-sm">
                               {player.displayName.charAt(0).toUpperCase()}
                             </div>
-                            <span className="font-medium text-sm">
-                              {player.displayName}
-                              {isCurrentUser && (
-                                <span className="ml-2 text-xs text-brand font-semibold">
-                                  (You)
-                                </span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-sm">
+                                {player.displayName}
+                                {isCurrentUser && (
+                                  <span className="ml-2 text-xs text-brand font-semibold">
+                                    (You)
+                                  </span>
+                                )}
+                              </span>
+                              {tier && (
+                                <Badge
+                                  variant="slate"
+                                  className={`border border-transparent px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.25em] ${tier.colorClass}`}
+                                >
+                                  {tier.label}
+                                </Badge>
                               )}
-                            </span>
+                            </div>
                           </div>
                         </td>
                         <td className="px-6 py-3 whitespace-nowrap">

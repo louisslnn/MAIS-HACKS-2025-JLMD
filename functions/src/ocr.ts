@@ -1,4 +1,4 @@
-import * as functions from "firebase-functions";
+import * as functions from "firebase-functions/v1";
 import * as fal from "@fal-ai/serverless-client";
 import type { OCRVerificationResult, WritingModeSubmission } from "./lib/types";
 
@@ -25,11 +25,13 @@ interface VerifyWrittenAnswersResponse {
  * Cloud Function to verify handwritten answers using Claude Sonnet 4.5 vision via fal.ai
  * Processes screenshots of handwritten answers and compares them against expected answers
  */
-export const verifyWrittenAnswers = functions.https.onCall(
-  async (
-    data: VerifyWrittenAnswersRequest,
-    context: functions.https.CallableContext
-  ): Promise<VerifyWrittenAnswersResponse> => {
+export const verifyWrittenAnswers = functions
+  .runWith({
+    secrets: ["FAL_KEY"],
+    timeoutSeconds: 300,
+    memory: "512MB",
+  })
+  .https.onCall(async (data, context) => {
     // Verify authentication
     if (!context.auth) {
       throw new functions.https.HttpsError(
@@ -72,7 +74,7 @@ export const verifyWrittenAnswers = functions.https.onCall(
         const imageUrl = await fal.storage.upload(blob);
 
         // Build the prompt - OCR solves ALL problems
-        const problemsInfo = expectedAnswers.map(item => {
+        const problemsInfo = expectedAnswers.map((item: any) => {
           return {
             id: item.id,
             type: item.type,

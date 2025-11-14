@@ -105,3 +105,7 @@ export function getAllProblems(category: 'addition' | 'integrals'): Problem[] {
   return problemsDatabase[category];
 }
 
+
+
+
+

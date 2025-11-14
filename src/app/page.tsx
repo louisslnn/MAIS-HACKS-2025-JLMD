@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { doc, onSnapshot } from "firebase/firestore";
+import { firestore } from "@/lib/firebase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { LoginButton } from "@/components/auth/LoginButton";
 import { Button } from "@/components/ui";
@@ -9,11 +11,89 @@ import { Button } from "@/components/ui";
 export default function Home() {
   const { user, loading } = useAuth();
   const [mounted, setMounted] = useState(false);
+  const [userRating, setUserRating] = useState<number | null>(null);
+  const [countdown, setCountdown] = useState<string>("");
+
+  const tournamentDate = useMemo(() => {
+    const timeZone = "America/Toronto";
+    const now = new Date();
+    const tzNow = new Date(now.toLocaleString("en-US", { timeZone }));
+    const currentDay = tzNow.getDay();
+    const daysUntilNextSunday = currentDay === 0 ? 7 : 7 - currentDay;
+    const daysUntilTournament = daysUntilNextSunday + 7;
+    const target = new Date(tzNow);
+    target.setDate(target.getDate() + daysUntilTournament);
+    target.setHours(12, 0, 0, 0);
+
+    const year = target.getFullYear();
+    const month = target.getMonth() + 1;
+    const dayOfMonth = target.getDate();
+
+    const pad = (value: number) => value.toString().padStart(2, "0");
+
+    const sampleUtcDate = new Date(Date.UTC(year, month - 1, dayOfMonth, 12, 0, 0));
+    const timezoneParts = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      timeZoneName: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).formatToParts(sampleUtcDate);
+    const tzName = timezoneParts.find((part) => part.type === "timeZoneName")?.value ?? "GMT-04";
+    const match = tzName.match(/GMT([+-]\d{1,2})(?::?(\d{2}))?/);
+    const sign = match?.[1]?.startsWith("-") ? "-" : "+";
+    const offsetHours = match ? Math.abs(parseInt(match[1], 10)) : 4;
+    const offsetMinutes = match?.[2] ? parseInt(match[2], 10) : 0;
+    const offsetString = `${sign}${offsetHours.toString().padStart(2, "0")}:${offsetMinutes
+      .toString()
+      .padStart(2, "0")}`;
+
+    return new Date(`${year}-${pad(month)}-${pad(dayOfMonth)}T12:00:00${offsetString}`);
+  }, []);
 
   // Fix hydration mismatch - only render after mount
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Fetch user rating from Firestore
+  useEffect(() => {
+    if (!user || !firestore) {
+      setUserRating(null);
+      return;
+    }
+
+    const userDocRef = doc(firestore, "users", user.uid);
+    const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setUserRating(data.rating || 1000);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  useEffect(() => {
+    const updateCountdown = () => {
+      const now = new Date();
+      const diff = tournamentDate.getTime() - now.getTime();
+      if (diff <= 0) {
+        setCountdown("Tournament day!");
+        return;
+      }
+      const totalSeconds = Math.floor(diff / 1000);
+      const days = Math.floor(totalSeconds / 86400);
+      const hours = Math.floor((totalSeconds % 86400) / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      setCountdown(`${days}d ${hours}h ${minutes}m ${seconds}s`);
+    };
+
+    updateCountdown();
+    const timer = window.setInterval(updateCountdown, 1000);
+    return () => window.clearInterval(timer);
+  }, [tournamentDate]);
 
   if (!mounted) {
     return (
@@ -39,20 +119,22 @@ export default function Home() {
 
       {/* Hero content */}
       <div className="relative z-10 mx-auto max-w-4xl px-6 text-center">
-        <div className="inline-flex items-center gap-2 rounded-full bg-brand/10 px-4 py-2 mb-8">
-          <span className="inline-block h-2 w-2 rounded-full bg-brand animate-pulse" />
-          <span className="text-sm font-medium text-brand">Real-time competitive math battles</span>
+        <div className="mb-6 inline-flex flex-col items-center gap-3 rounded-2xl border border-brand/30 bg-white/80 px-6 py-4 text-center text-ink shadow-md backdrop-blur-sm">
+          <span className="text-xs font-semibold uppercase tracking-widest text-brand">Tournament Alert</span>
+          <h2 className="text-lg font-semibold">
+            Cash-prize MathClash Tournament — Sign-ups opening soon!
+          </h2>
+          <p className="text-sm text-ink-soft">
+            Winner earns <strong className="text-brand">$100 CAD</strong>; the rest of the podium takes <strong className="text-brand">$50 CAD</strong>.
+          </p>
+          <div className="flex flex-col items-center">
+            <span className="text-2xl font-mono font-bold text-ink">{countdown}</span>
+          </div>
         </div>
-
-        <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-ink mb-6 tracking-tight">
+        <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-ink mb-12 tracking-tight">
           Master Math Through
           <span className="block text-brand">Real Competition</span>
         </h1>
-
-        <p className="text-lg sm:text-xl text-ink-soft max-w-2xl mx-auto mb-12">
-          Face off in lightning-fast 1v1 math battles. Climb the leaderboard with your Elo rating. 
-          Sharpen your skills in real-time against players worldwide.
-        </p>
 
         <div className="flex flex-col items-center justify-center gap-6">
           {loading ? (
@@ -61,22 +143,40 @@ export default function Home() {
               <span>Loading...</span>
             </div>
           ) : user ? (
-            <div className="flex flex-col sm:flex-row items-center gap-4">
-              <Link 
-                href="/play"
-                className="inline-flex items-center justify-center gap-2 h-12 rounded-full px-8 py-6 text-lg font-medium bg-brand text-white shadow-sm hover:bg-brand/90 transition-colors cursor-pointer"
-              >
-                Enter Arena
-                <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                </svg>
-              </Link>
-              <Link 
-                href="/social"
-                className="inline-flex items-center justify-center gap-2 h-12 rounded-full px-8 py-6 text-lg font-medium border border-border text-ink hover:bg-surface-muted transition-colors cursor-pointer"
-              >
-                View Social
-              </Link>
+            <div className="flex flex-col items-center gap-6">
+              <div className="flex flex-col sm:flex-row items-center gap-6">
+                <Link
+                  href="/play"
+                  className="inline-flex items-center justify-center gap-3 h-16 rounded-full px-12 py-8 text-2xl font-bold bg-brand text-white shadow-lg hover:bg-brand/90 transition-all hover:scale-105 cursor-pointer"
+                >
+                  Quick Match
+                  <svg className="ml-2 w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </Link>
+                <Link 
+                  href="/play"
+                  className="inline-flex items-center justify-center gap-3 h-16 rounded-full px-12 py-8 text-2xl font-bold border-2 border-brand text-brand hover:bg-brand/10 transition-all hover:scale-105 cursor-pointer"
+                >
+                  Practice
+                  <svg className="ml-2 w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                </Link>
+              </div>
+              
+              {/* Player ELO Display */}
+              {userRating !== null && (
+                <div className="flex items-center gap-3 px-6 py-3 rounded-full bg-gradient-to-r from-brand/10 to-brand-secondary/10 border border-brand/30">
+                  <svg className="w-5 h-5 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                  <div className="text-center">
+                    <span className="text-sm text-ink-soft">Your ELO:</span>
+                    <span className="ml-2 text-xl font-bold text-brand">{userRating}</span>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <>
@@ -96,38 +196,6 @@ export default function Home() {
           )}
         </div>
 
-        {/* Features grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-20">
-          <div className="p-6 rounded-2xl bg-surface border border-border hover:border-brand/50 transition">
-            <div className="h-12 w-12 rounded-xl bg-brand/10 flex items-center justify-center mb-4 mx-auto">
-              <svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </div>
-            <h3 className="font-semibold text-ink mb-2">Lightning Fast</h3>
-            <p className="text-sm text-ink-soft">Real-time battles with instant matching and live opponent tracking</p>
-          </div>
-
-          <div className="p-6 rounded-2xl bg-surface border border-border hover:border-brand/50 transition">
-            <div className="h-12 w-12 rounded-xl bg-brand/10 flex items-center justify-center mb-4 mx-auto">
-              <svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-            </div>
-            <h3 className="font-semibold text-ink mb-2">Elo Ranking</h3>
-            <p className="text-sm text-ink-soft">Fair competitive rating system tracks your skill progression</p>
-          </div>
-
-          <div className="p-6 rounded-2xl bg-surface border border-border hover:border-brand/50 transition">
-            <div className="h-12 w-12 rounded-xl bg-brand/10 flex items-center justify-center mb-4 mx-auto">
-              <svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-              </svg>
-            </div>
-            <h3 className="font-semibold text-ink mb-2">Multiple Modes</h3>
-            <p className="text-sm text-ink-soft">Practice solo or compete in ranked battles with varied difficulty</p>
-          </div>
-        </div>
       </div>
     </div>
   );

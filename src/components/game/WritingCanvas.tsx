@@ -24,8 +24,9 @@ export const WritingCanvas = forwardRef<HTMLCanvasElement, WritingCanvasProps>(f
   // Merge refs - use external ref if provided, otherwise internal
   const actualRef = (ref as React.RefObject<HTMLCanvasElement>) || canvasRef;
   const [isDrawing, setIsDrawing] = useState(false);
-  const [penColor, setPenColor] = useState("#000000");
-  const [penThickness, setPenThickness] = useState(3);
+  // Fixed defaults: black pen, medium thickness
+  const penColor = "#000000";
+  const penThickness = 3;
 
   // Initialize canvas
   useEffect(() => {
@@ -168,29 +169,6 @@ export const WritingCanvas = forwardRef<HTMLCanvasElement, WritingCanvasProps>(f
         >
           Clear
         </Button>
-
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-ink-soft">Color:</label>
-          <input
-            type="color"
-            value={penColor}
-            onChange={(e) => setPenColor(e.target.value)}
-            className="w-8 h-8 rounded cursor-pointer"
-          />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-ink-soft">Thickness:</label>
-          <input
-            type="range"
-            min="1"
-            max="10"
-            value={penThickness}
-            onChange={(e) => setPenThickness(Number(e.target.value))}
-            className="w-24"
-          />
-          <span className="text-xs text-ink-soft w-6">{penThickness}</span>
-        </div>
       </div>
     </div>
   );
@@ -201,4 +179,3 @@ export function exportCanvasAsBase64(canvasRef: React.RefObject<HTMLCanvasElemen
   if (!canvasRef.current) return null;
   return canvasRef.current.toDataURL("image/png");
 }
-

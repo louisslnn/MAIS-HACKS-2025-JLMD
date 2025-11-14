@@ -70,3 +70,7 @@ export function Dialog({ open, onClose, children, title }: DialogProps) {
     </dialog>
   );
 }
+
+
+
+

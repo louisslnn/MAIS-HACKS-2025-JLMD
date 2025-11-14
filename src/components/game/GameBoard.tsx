@@ -18,6 +18,8 @@ interface GameBoardProps {
   answers: Record<string, AnswerDocument[]>;
 }
 
+const AI_FEEDBACK_ENABLED = process.env.NEXT_PUBLIC_ENABLE_AI_FEEDBACK === "true";
+
 export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
   const { user } = useAuth();
   const { opponentState, state, submitPracticeAnswer, applyPracticeOcrResults, setPracticeFeedback, completePracticeMatch } = useMatch();
@@ -110,39 +112,43 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
     // Wait a tick for state to propagate
     await new Promise(resolve => setTimeout(resolve, 100));
     
-    // Generate AI feedback
+    // Generate AI feedback (optional)
     try {
-      console.log("Generating AI feedback...");
-      const correctCount = allResults.filter(r => r.is_correct).length;
-      
-      // Build problem results with full problem text
-      const problemResults: ProblemResult[] = allResults.map((result) => {
-        const round = rounds.find(r => parseInt(r.id, 10) === result.id);
-        return {
-          id: result.id,
-          problem: round?.prompt || `Problem ${result.id}`,
-          type: result.type,
-          is_correct: result.is_correct,
-          confidence: result.confidence,
-          notes: result.notes,
-        };
-      });
-      
-      const feedbackResponse = await generatePracticeFeedback({
-        results: problemResults,
-        totalProblems: allResults.length,
-        correctCount: correctCount,
-      });
-      
-      console.log("[GameBoard] Feedback response:", feedbackResponse);
-      if (feedbackResponse.data?.success && feedbackResponse.data.feedback) {
-        console.log("[GameBoard] AI feedback generated successfully:", feedbackResponse.data.feedback);
-        
-        // Store feedback in context state (not localStorage)
-        setPracticeFeedback(feedbackResponse.data.feedback);
-        console.log("[GameBoard] Feedback stored in context");
+      if (!AI_FEEDBACK_ENABLED) {
+        console.log("[GameBoard] AI feedback disabled; skipping generation.");
       } else {
-        console.error("[GameBoard] Failed to generate AI feedback:", feedbackResponse.data?.error);
+        console.log("Generating AI feedback...");
+        const correctCount = allResults.filter(r => r.is_correct).length;
+        
+        // Build problem results with full problem text
+        const problemResults: ProblemResult[] = allResults.map((result) => {
+          const round = rounds.find(r => parseInt(r.id, 10) === result.id);
+          return {
+            id: result.id,
+            problem: round?.prompt || `Problem ${result.id}`,
+            type: result.type,
+            is_correct: result.is_correct,
+            confidence: result.confidence,
+            notes: result.notes,
+          };
+        });
+        
+        const feedbackResponse = await generatePracticeFeedback({
+          results: problemResults,
+          totalProblems: allResults.length,
+          correctCount: correctCount,
+        });
+        
+        console.log("[GameBoard] Feedback response:", feedbackResponse);
+        if (feedbackResponse.data?.success && feedbackResponse.data.feedback) {
+          console.log("[GameBoard] AI feedback generated successfully:", feedbackResponse.data.feedback);
+          
+          // Store feedback in context state (not localStorage)
+          setPracticeFeedback(feedbackResponse.data.feedback);
+          console.log("[GameBoard] Feedback stored in context");
+        } else {
+          console.error("[GameBoard] Failed to generate AI feedback:", feedbackResponse.data?.error);
+        }
       }
     } catch (error) {
       console.error("Error generating AI feedback:", error);
@@ -481,56 +487,6 @@ export function GameBoard({ match, activeRound, answers }: GameBoardProps) {
         )}
       </div>
 
-      {/* Opponent Card */}
-      {opponentId && (
-        <div className="rounded-xl border border-border bg-surface p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-ink">Opponent</h3>
-            {opponentState && (
-              <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-green-50">
-                <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                <span className="text-xs font-medium text-green-700">
-                  Round {opponentState.currentRound}
-                </span>
-              </div>
-            )}
-          </div>
-          
-          <div className="flex items-center gap-3">
-            {opponentAnswer ? (
-              <>
-                <div className="flex-shrink-0">
-                  <div className="h-10 w-10 rounded-full bg-brand/10 flex items-center justify-center">
-                    <svg className="w-5 h-5 text-brand" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                </div>
-                <div>
-                  <p className="font-medium text-ink">Submitted</p>
-                  {roundLocked && opponentAnswer.correct !== undefined && (
-                    <p className={`text-sm ${opponentAnswer.correct ? "text-green-600" : "text-red-600"}`}>
-                      {opponentAnswer.correct ? "Correct" : "Incorrect"}
-                    </p>
-                  )}
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="flex-shrink-0">
-                  <div className="h-10 w-10 rounded-full bg-ink-subtle/10 flex items-center justify-center">
-                    <svg className="w-5 h-5 text-ink-subtle animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                  </div>
-                </div>
-                <p className="text-ink-soft">Working on answer...</p>
-              </>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Round Results */}
       {roundLocked && currentUserAnswer && opponentAnswer && (

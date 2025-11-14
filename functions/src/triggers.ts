@@ -1,7 +1,7 @@
 import { Timestamp } from "firebase-admin/firestore";
 import type { DocumentData } from "firebase-admin/firestore";
+import * as functions from "firebase-functions/v1";
 import { logger } from "firebase-functions";
-import { onDocumentUpdated } from "firebase-functions/v2/firestore";
 
 import { db, increment, serverTimestamp, collections } from "./config";
 import { generateDeterministicRound } from "./lib/questions";
@@ -36,154 +36,191 @@ function determineWinner(match: MatchDocument) {
   return { winner: uidB, resultA: 0 as const };
 }
 
-export const onRoundLocked = onDocumentUpdated(
-  {
-    document: "matches/{matchId}/rounds/{roundId}",
-    region: "us-central1",
-  },
-  async (event) => {
-    const beforeStatus = event.data?.before?.data()?.status;
-    const after = event.data?.after?.data();
+export const onRoundLocked = functions
+  .region("us-central1")
+  .firestore.document("matches/{matchId}/rounds/{roundId}")
+  .onUpdate(async (change, context) => {
+    try {
+      const beforeStatus = change.before.data()?.status;
+      const after = change.after.data();
 
-    if (!after) return;
-    if (after.status !== "locked") return;
-    if (beforeStatus === "locked") return;
-    if (after.finalizedAt) return;
+      if (!after) return;
+      if (after.status !== "locked") return;
+      if (beforeStatus === "locked") return;
+      if (after.finalizedAt) return;
 
-    const { matchId, roundId } = event.params;
-    const matchRef = db.collection(collections.matches).doc(matchId);
-    const roundRef = matchRef.collection("rounds").doc(roundId);
+      const { matchId, roundId } = context.params;
+      const matchRef = db.collection(collections.matches).doc(matchId);
+      const roundRef = matchRef.collection("rounds").doc(roundId);
 
-    const answersSnap = await roundRef.collection("answers").get();
-    const answers = answersSnap.docs.reduce<Record<string, DocumentData>>((acc, doc) => {
-      acc[doc.id] = doc.data();
-      return acc;
-    }, {});
+      // Wait a bit for answers to propagate if round was just locked
+      // This ensures we see all answers that were committed in the same transaction
+      await new Promise(resolve => setTimeout(resolve, 100));
 
-    await db.runTransaction(async (tx) => {
-      const matchSnap = await tx.get(matchRef);
-      if (!matchSnap.exists) return;
-      const match = matchSnap.data() as MatchDocument & {
-        ratingProcessed?: boolean;
-      };
-
-      const roundSnap = await tx.get(roundRef);
-      const freshRound = roundSnap.data();
-      if (!freshRound) return;
-      if (freshRound.finalizedAt) {
-        return;
-      }
-
-      const now = Timestamp.now();
-      const roundIndex = Number(roundId);
-
-      const updates: Record<string, unknown> = {
-        updatedAt: now,
-      };
-
-      const roundResults: Record<string, { correct: boolean; timeMs: number }> =
-        {};
-
-      match.playerIds.forEach((uid) => {
-        const answer = answers[uid];
-        const correct = Boolean(answer?.correct);
-        const timeMs =
-          typeof answer?.timeMs === "number"
-            ? answer.timeMs
-            : match.settings.roundDurationMs;
-
-        roundResults[uid] = { correct, timeMs };
-
-        updates[`players.${uid}.correctCount`] = increment(correct ? 1 : 0);
-        updates[`players.${uid}.totalTimeMs`] = increment(timeMs);
-        updates[`players.${uid}.score`] = increment(correct ? 1 : 0);
+      const answersSnap = await roundRef.collection("answers").get();
+      const answers = answersSnap.docs.reduce<Record<string, DocumentData>>((acc, doc) => {
+        acc[doc.id] = doc.data();
+        return acc;
+      }, {});
+      
+      logger.info("Processing locked round", {
+        matchId,
+        roundId,
+        answerCount: answersSnap.docs.length,
+        playerIds: Object.keys(answers),
       });
 
-      const isFinalRound = roundIndex >= match.settings.rounds;
+      await db.runTransaction(async (tx) => {
+        const matchSnap = await tx.get(matchRef);
+        if (!matchSnap.exists) return;
+        const match = matchSnap.data() as MatchDocument & {
+          ratingProcessed?: boolean;
+        };
 
-      if (isFinalRound) {
-        const projectedMatch: MatchDocument = JSON.parse(
-          JSON.stringify(match),
-        );
+        const roundSnap = await tx.get(roundRef);
+        const freshRound = roundSnap.data();
+        if (!freshRound) return;
+        if (freshRound.finalizedAt) {
+          return;
+        }
 
-        projectedMatch.players = { ...projectedMatch.players };
-        projectedMatch.playerIds.forEach((uid) => {
-          const player = projectedMatch.players[uid];
-          const delta = roundResults[uid];
-          player.correctCount += delta.correct ? 1 : 0;
-          player.totalTimeMs += delta.timeMs;
-          player.score += delta.correct ? 1 : 0;
+        const now = Timestamp.now();
+        const roundIndex = Number(roundId);
+
+        const updates: Record<string, unknown> = {
+          updatedAt: now,
+        };
+
+        const roundResults: Record<string, { correct: boolean; timeMs: number }> =
+          {};
+
+        match.playerIds.forEach((uid) => {
+          const answer = answers[uid];
+          const correct = Boolean(answer?.correct);
+          const timeMs =
+            typeof answer?.timeMs === "number"
+              ? answer.timeMs
+              : match.settings.roundDurationMs;
+
+          roundResults[uid] = { correct, timeMs };
+
+          updates[`players.${uid}.correctCount`] = increment(correct ? 1 : 0);
+          updates[`players.${uid}.totalTimeMs`] = increment(timeMs);
+          updates[`players.${uid}.score`] = increment(correct ? 1 : 0);
         });
 
-        const { winner } = determineWinner(projectedMatch);
-        updates.status = "completed";
-        updates.completedAt = now;
-        updates.winner = winner ?? null;
-        
-        // Update player states to idle when match completes
-        match.playerIds.forEach((playerId) => {
-          updatePlayerState(playerId, "idle").catch((error) => {
-            logger.error("Failed to update player state on match completion", {
-              playerId,
-              error: error instanceof Error ? error.message : String(error),
+        const isFinalRound = roundIndex >= match.settings.rounds;
+
+        if (isFinalRound) {
+          const projectedMatch: MatchDocument = JSON.parse(
+            JSON.stringify(match),
+          );
+
+          projectedMatch.players = { ...projectedMatch.players };
+          projectedMatch.playerIds.forEach((uid) => {
+            const player = projectedMatch.players[uid];
+            const delta = roundResults[uid];
+            player.correctCount += delta.correct ? 1 : 0;
+            player.totalTimeMs += delta.timeMs;
+            player.score += delta.correct ? 1 : 0;
+          });
+
+          const { winner } = determineWinner(projectedMatch);
+          updates.status = "completed";
+          updates.completedAt = now;
+          updates.winner = winner ?? null;
+          updates.activeRoundId = null;
+          
+          // Update player states to idle when match completes
+          match.playerIds.forEach((playerId) => {
+            updatePlayerState(playerId, "idle").catch((error) => {
+              logger.error("Failed to update player state on match completion", {
+                playerId,
+                error: error instanceof Error ? error.message : String(error),
+              });
             });
           });
-        });
-      } else {
-        const nextRoundIndex = roundIndex + 1;
-        const nextRoundRef = matchRef
-          .collection("rounds")
-          .doc(String(nextRoundIndex));
+        } else {
+          const nextRoundIndex = roundIndex + 1;
+          const nextRoundRef = matchRef
+            .collection("rounds")
+            .doc(String(nextRoundIndex));
 
-        const nextRoundExists = await tx.get(nextRoundRef);
-        if (!nextRoundExists.exists) {
-          // Determine category from match settings or default to addition
-          const settings = match.settings as unknown as Record<string, unknown>;
-          const category = settings?.category || 'addition';
-          const generated = generateDeterministicRound(
-            match.seed,
-            nextRoundIndex,
-            category as 'addition' | 'integrals',
-          );
-          const startAt = Timestamp.fromMillis(now.toMillis() + 2_000);
+          const nextRoundExists = await tx.get(nextRoundRef);
+          const startAt = Timestamp.fromMillis(now.toMillis() + 500);
           const endsAt = Timestamp.fromMillis(
             startAt.toMillis() + match.settings.roundDurationMs,
           );
 
-          tx.set(nextRoundRef, {
-            status: "active",
-            prompt: generated.prompt,
-            canonical: generated.canonical,
-            answerHash: generated.answerHash,
-            startAt,
-            endsAt,
-            difficulty: generated.difficulty,
-            createdBy: "generator:v1",
-            roundIndex: nextRoundIndex,
-          });
+          if (!nextRoundExists.exists) {
+            // Fallback: round document missing, generate it on the fly
+            const settings = match.settings as unknown as Record<string, unknown>;
+            const category = settings?.category || settings?.problemCategory || 'addition';
+            const generated = generateDeterministicRound(
+              match.seed,
+              nextRoundIndex,
+              category as 'addition' | 'integrals',
+            );
+
+            tx.set(nextRoundRef, {
+              status: "active",
+              prompt: generated.prompt,
+              canonical: generated.canonical,
+              answerHash: generated.answerHash,
+              startAt,
+              endsAt,
+              difficulty: generated.difficulty,
+              createdBy: "generator:v1",
+              roundIndex: nextRoundIndex,
+            });
+
+            logger.info("Generated missing next round", {
+              matchId,
+              nextRoundIndex,
+              category,
+            });
+          } else {
+            tx.update(nextRoundRef, {
+              status: "active",
+              startAt,
+              endsAt,
+              updatedAt: now,
+            });
+
+            logger.info("Activated existing next round", {
+              matchId,
+              nextRoundIndex,
+            });
+          }
+          updates.activeRoundId = String(nextRoundIndex);
         }
-      }
 
-      tx.update(matchRef, updates);
-      tx.update(roundRef, {
-        finalizedAt: now,
-        results: roundResults,
-        updatedAt: now,
+        tx.update(matchRef, updates);
+        tx.update(roundRef, {
+          finalizedAt: now,
+          results: roundResults,
+          updatedAt: now,
+        });
       });
-    });
 
-    logger.info("Finalised round", { matchId, roundId });
-  },
-);
+      logger.info("Finalised round", { matchId, roundId });
+    } catch (error) {
+      logger.error("Failed to process locked round", {
+        matchId: context.params.matchId,
+        roundId: context.params.roundId,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      // Don't throw - allow trigger to complete to avoid infinite retries
+    }
+  });
 
-export const onMatchCompleted = onDocumentUpdated(
-  {
-    document: "matches/{matchId}",
-    region: "us-central1",
-  },
-  async (event) => {
-    const beforeStatus = event.data?.before?.data()?.status;
-    const after = event.data?.after?.data() as
+export const onMatchCompleted = functions
+  .region("us-central1")
+  .firestore.document("matches/{matchId}")
+  .onUpdate(async (change, context) => {
+    const beforeStatus = change.before.data()?.status;
+    const after = change.after.data() as
       | (MatchDocument & { ratingProcessed?: boolean })
       | undefined;
 
@@ -192,7 +229,7 @@ export const onMatchCompleted = onDocumentUpdated(
     if (beforeStatus === "completed") return;
     if (after.ratingProcessed) return;
 
-    const { matchId } = event.params;
+    const { matchId } = context.params;
     const matchRef = db.collection(collections.matches).doc(matchId);
 
     await db.runTransaction(async (tx) => {
@@ -360,5 +397,4 @@ export const onMatchCompleted = onDocumentUpdated(
     });
 
     logger.info("Processed match completion", { matchId });
-  },
-);
+  });

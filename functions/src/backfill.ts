@@ -2,8 +2,8 @@
  * Backfill missing user documents
  */
 
-import { onCall } from "firebase-functions/v2/https";
-import { logger } from "firebase-functions/v2";
+import * as functions from "firebase-functions/v1";
+import { logger } from "firebase-functions";
 import { db } from "./config";
 import { auth } from "firebase-admin";
 import { Timestamp, FieldValue } from "firebase-admin/firestore";
@@ -15,6 +15,8 @@ const collections = {
 interface UserDocument {
   uid: string;
   displayName: string;
+  displayNameLower: string;
+  searchPrefixes: string[];
   email: string;
   rating: number;
   stats: {
@@ -26,12 +28,49 @@ interface UserDocument {
     totalTimeMs: number;
   };
   createdAt: Timestamp;
-  updatedAt: any;
+  updatedAt: Timestamp | FieldValue;
 }
 
-export const backfillUserDocuments = onCall(
-  { enforceAppCheck: false, region: "us-central1", timeoutSeconds: 540 },
-  async () => {
+const MAX_SEARCH_PREFIXES = 50;
+
+function buildSearchPrefixes(name: string, maxPrefixes = MAX_SEARCH_PREFIXES): string[] {
+  const normalized = name.toLowerCase().trim();
+  if (!normalized) {
+    return [];
+  }
+
+  const prefixes = new Set<string>();
+  const words = normalized.split(/\s+/).filter(Boolean);
+
+  for (const word of words) {
+    let current = "";
+    for (const char of word) {
+      current += char;
+      prefixes.add(current);
+    }
+  }
+
+  let running = "";
+  for (const char of normalized) {
+    if (char === " ") {
+      running = "";
+      continue;
+    }
+    running += char;
+    prefixes.add(running);
+  }
+
+  prefixes.add(normalized);
+
+  return Array.from(prefixes)
+    .filter(Boolean)
+    .slice(0, maxPrefixes);
+}
+
+export const backfillUserDocuments = functions
+  .region("us-central1")
+  .runWith({ timeoutSeconds: 540 })
+  .https.onCall(async (data, context) => {
     logger.info("Starting user document backfill...");
     
     let backfilledCount = 0;
@@ -55,10 +94,18 @@ export const backfillUserDocuments = onCall(
             const userSnap = await userRef.get();
             
             if (!userSnap.exists) {
+              const rawName = (userRecord.displayName || "").trim();
+              const resolvedName =
+                rawName.length > 0
+                  ? rawName
+                  : userRecord.email?.split("@")[0]?.trim() || "Anonymous";
+
               // User document missing - create it
               const userData: UserDocument = {
                 uid: userRecord.uid,
-                displayName: userRecord.displayName || "Anonymous",
+                displayName: resolvedName,
+                displayNameLower: resolvedName.toLowerCase(),
+                searchPrefixes: buildSearchPrefixes(resolvedName),
                 email: userRecord.email || "",
                 rating: 1000, // Default Chess.com-style rating
                 stats: {
@@ -79,12 +126,16 @@ export const backfillUserDocuments = onCall(
             } else {
               // Check if document has all required fields
               const data = userSnap.data();
-              const needsUpdate = !data?.stats || 
-                                  data.rating === undefined || 
-                                  !data.displayName;
+              const needsUpdate =
+                !data?.stats ||
+                data.rating === undefined ||
+                !data.displayName ||
+                !data.displayNameLower ||
+                !Array.isArray(data.searchPrefixes) ||
+                data.searchPrefixes.length === 0;
               
               if (needsUpdate) {
-                const updates: any = {};
+                const updates: Partial<UserDocument> & Record<string, unknown> = {};
                 
                 if (!data?.stats) {
                   updates.stats = {
@@ -100,9 +151,27 @@ export const backfillUserDocuments = onCall(
                 if (data?.rating === undefined) {
                   updates.rating = 1000;
                 }
+
+                const existingName =
+                  (typeof data?.displayName === "string" && data.displayName.trim().length > 0
+                    ? data.displayName
+                    : userRecord.displayName) ||
+                  userRecord.email?.split("@")[0] ||
+                  "Anonymous";
+                const resolvedName = existingName.trim().length > 0 ? existingName.trim() : "Anonymous";
+                const resolvedLower = resolvedName.toLowerCase();
+                const resolvedPrefixes = buildSearchPrefixes(resolvedName);
                 
-                if (!data?.displayName) {
-                  updates.displayName = userRecord.displayName || "Anonymous";
+                if (data?.displayName !== resolvedName) {
+                  updates.displayName = resolvedName;
+                }
+                
+                if (data?.displayNameLower !== resolvedLower) {
+                  updates.displayNameLower = resolvedLower;
+                }
+                
+                if (!Array.isArray(data?.searchPrefixes) || data.searchPrefixes.length === 0) {
+                  updates.searchPrefixes = resolvedPrefixes;
                 }
                 
                 if (!data?.email) {
@@ -146,6 +215,4 @@ export const backfillUserDocuments = onCall(
       logger.error("Fatal error during backfill:", error);
       throw error;
     }
-  }
-);
-
+  });

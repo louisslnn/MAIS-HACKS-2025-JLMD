@@ -4,7 +4,7 @@
  */
 
 import { logger } from "firebase-functions";
-import { onCall, HttpsError } from "firebase-functions/v2/https";
+import * as functions from "firebase-functions/v1";
 import { z } from "zod";
 
 import { db, env } from "./config";
@@ -16,33 +16,33 @@ const getFeedbackSchema = z.object({
   matchId: z.string().min(1),
 });
 
-export const getGameFeedback = onCall(
-  { enforceAppCheck: false, region: "us-central1" },
-  async (request) => {
-    if (!request.auth) {
-      throw new HttpsError("unauthenticated", "Sign in to get feedback.");
+export const getGameFeedback = functions
+  .region("us-central1")
+  .https.onCall(async (data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "Sign in to get feedback.");
     }
 
-    const payload = getFeedbackSchema.safeParse(request.data);
+    const payload = getFeedbackSchema.safeParse(data);
     if (!payload.success) {
-      throw new HttpsError("invalid-argument", "Invalid feedback request.");
+      throw new functions.https.HttpsError("invalid-argument", "Invalid feedback request.");
     }
 
     const { matchId } = payload.data;
-    const uid = request.auth.uid;
+    const uid = context.auth.uid;
 
     const matchRef = db.collection("matches").doc(matchId);
     const matchSnap = await matchRef.get();
 
     if (!matchSnap.exists) {
-      throw new HttpsError("not-found", "Match not found.");
+      throw new functions.https.HttpsError("not-found", "Match not found.");
     }
 
     const match = matchSnap.data() as MatchDocument;
 
     // Ensure user is a participant
     if (!match.playerIds.includes(uid)) {
-      throw new HttpsError(
+      throw new functions.https.HttpsError(
         "permission-denied",
         "You are not a participant in this match.",
       );
@@ -50,7 +50,7 @@ export const getGameFeedback = onCall(
 
     // Only generate feedback for completed matches with integrals
     if (match.status !== "completed") {
-      throw new HttpsError(
+      throw new functions.https.HttpsError(
         "failed-precondition",
         "Match must be completed to get feedback.",
       );
@@ -150,6 +150,4 @@ export const getGameFeedback = onCall(
         feedback: "Unable to generate AI feedback at this time. Great job playing though!",
       };
     }
-  },
-);
-
+  });

@@ -25,6 +25,14 @@ service cloud.firestore {
         allow create: if signedIn() && request.auth.uid == uid;
         allow delete: if signedIn() && request.auth.uid == uid;
       }
+
+      // Incoming friend requests
+      match /friendRequests/{requestId} {
+        allow read: if signedIn() && request.auth.uid == uid;
+        allow update: if signedIn() && request.auth.uid == uid;
+        allow delete: if signedIn() && request.auth.uid == uid;
+        allow create: if false; // Only Cloud Functions may create
+      }
     }
 
     match /matches/{matchId} {

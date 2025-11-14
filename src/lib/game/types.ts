@@ -41,6 +41,13 @@ export interface MatchDocument {
   seed?: string;
   ratingChanges?: Record<string, RatingChangeEntry>;
   ratingProcessed?: boolean;
+  winner?: string | null;
+  activeRoundId?: string | null;
+  celebration?: {
+    emoteId: string;
+    triggeredBy: string;
+    triggeredAt?: string;
+  };
 }
 
 export interface CanonicalPrompt {

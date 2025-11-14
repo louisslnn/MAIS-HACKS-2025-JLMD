@@ -1,7 +1,7 @@
 import { Timestamp } from "firebase-admin/firestore";
+import * as functions from "firebase-functions/v1";
 import { logger } from "firebase-functions";
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { z } from "zod";
 
 import { db, serverTimestamp, collections, getQueueRef } from "./config";
@@ -187,27 +187,24 @@ async function tryMatchImmediately(
   return matchId;
 }
 
-export const requestQuickMatch = onCall(
-  { 
-    enforceAppCheck: false, 
-    region: "us-central1",
-  },
-  async (request) => {
+export const requestQuickMatch = functions
+  .region("us-central1")
+  .https.onCall(async (data, context) => {
     try {
-      if (!request.auth) {
-        throw new HttpsError("unauthenticated", "Sign in to join the queue.");
+      if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "Sign in to join the queue.");
       }
 
-      const payload = requestSchema.safeParse(request.data ?? {});
+      const payload = requestSchema.safeParse(data ?? {});
       if (!payload.success) {
-        throw new HttpsError("invalid-argument", "Invalid matchmaking payload.");
+        throw new functions.https.HttpsError("invalid-argument", "Invalid matchmaking payload.");
       }
 
-      const uid = request.auth.uid;
+      const uid = context.auth.uid;
       const userRef = db.collection(collections.users).doc(uid);
       const userSnap = await userRef.get();
       if (!userSnap.exists) {
-        throw new HttpsError(
+        throw new functions.https.HttpsError(
           "failed-precondition",
           "Create a player profile before joining the queue.",
         );
@@ -264,26 +261,22 @@ export const requestQuickMatch = onCall(
     } catch (error) {
       // Ensure CORS headers are sent even on error
       logger.error("Matchmaking error", { error: error instanceof Error ? error.message : String(error) });
-      if (error instanceof HttpsError) {
+      if (error instanceof functions.https.HttpsError) {
         throw error;
       }
-      throw new HttpsError("internal", "An error occurred during matchmaking.");
+      throw new functions.https.HttpsError("internal", "An error occurred during matchmaking.");
     }
-  },
-);
+  });
 
-export const cancelQueue = onCall(
-  {
-    enforceAppCheck: false,
-    region: "us-central1",
-  },
-  async (request) => {
+export const cancelQueue = functions
+  .region("us-central1")
+  .https.onCall(async (data, context) => {
     try {
-      if (!request.auth) {
-        throw new HttpsError("unauthenticated", "Sign in to cancel queue.");
+      if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "Sign in to cancel queue.");
       }
 
-      const uid = request.auth.uid;
+      const uid = context.auth.uid;
       const ticketRef = getQueueRef().doc(uid);
       const ticketSnap = await ticketRef.get();
 
@@ -298,13 +291,12 @@ export const cancelQueue = onCall(
       return { success: true };
     } catch (error) {
       logger.error("Cancel queue error", { error: error instanceof Error ? error.message : String(error) });
-      if (error instanceof HttpsError) {
+      if (error instanceof functions.https.HttpsError) {
         throw error;
       }
-      throw new HttpsError("internal", "An error occurred while canceling queue.");
+      throw new functions.https.HttpsError("internal", "An error occurred while canceling queue.");
     }
-  },
-);
+  });
 
 export const quickMatchmaker = onSchedule(
   {

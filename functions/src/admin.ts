@@ -1,6 +1,6 @@
 import { Timestamp } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
-import { onCall, HttpsError } from "firebase-functions/v2/https";
+import * as functions from "firebase-functions/v1";
 
 import { db, collections, getQueueRef, serverTimestamp } from "./config";
 import type { MatchDocument } from "./lib/types";
@@ -8,9 +8,9 @@ import type { MatchDocument } from "./lib/types";
 /**
  * Reset all users to 1000 rating (Chess.com baseline)
  */
-export const resetAllRatings = onCall(
-  { enforceAppCheck: false, region: "us-central1" },
-  async () => {
+export const resetAllRatings = functions
+  .region("us-central1")
+  .https.onCall(async (data, context) => {
     try {
       logger.info("Starting global rating reset to 1000");
       
@@ -63,7 +63,7 @@ export const resetAllRatings = onCall(
       };
     } catch (error) {
       logger.error("Error resetting ratings:", error);
-      throw new HttpsError("internal", "Failed to reset ratings");
+      throw new functions.https.HttpsError("internal", "Failed to reset ratings");
     }
   }
 );
@@ -72,20 +72,17 @@ export const resetAllRatings = onCall(
  * Admin function to clean up old/abandoned matches and reset player states
  * This is a one-time cleanup for existing data issues
  */
-export const cleanupOldMatches = onCall(
-  { 
-    enforceAppCheck: false, 
-    region: "us-central1",
-  },
-  async (request) => {
+export const cleanupOldMatches = functions
+  .region("us-central1")
+  .https.onCall(async (data, context) => {
     try {
       // For security, you could add admin check here
       // For now, any authenticated user can call (temporary for cleanup)
-      if (!request.auth) {
-        throw new HttpsError("unauthenticated", "Sign in to run cleanup.");
+      if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "Sign in to run cleanup.");
       }
 
-      logger.info("Starting old matches cleanup", { requestedBy: request.auth.uid });
+      logger.info("Starting old matches cleanup", { requestedBy: context.auth.uid });
 
       const now = Timestamp.now();
       const oneHourAgo = Timestamp.fromMillis(now.toMillis() - 60 * 60 * 1000);
@@ -222,17 +219,15 @@ export const cleanupOldMatches = onCall(
         error: error instanceof Error ? error.message : String(error),
       });
 
-      if (error instanceof HttpsError) {
+      if (error instanceof functions.https.HttpsError) {
         throw error;
       }
 
-      throw new HttpsError(
+      throw new functions.https.HttpsError(
         "internal",
         error instanceof Error
           ? error.message
           : "An error occurred during cleanup.",
       );
     }
-  },
-);
-
+  });
